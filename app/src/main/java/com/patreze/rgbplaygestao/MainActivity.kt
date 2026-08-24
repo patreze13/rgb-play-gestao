@@ -501,105 +501,37 @@ class MainActivity : Activity() {
             }
 
         val logo =
-            TextView(this).apply {
+            android.widget.ImageView(this).apply {
 
-                text = "RGB"
-
-                textSize = 42f
-
-                gravity =
-                    Gravity.CENTER
-
-                typeface =
-                    Typeface.DEFAULT_BOLD
-
-                setTextColor(branco)
-
-                setPadding(
-                    0,
-                    0,
-                    0,
-                    0
+                setImageResource(
+                    R.drawable.logo_rgb
                 )
+
+                scaleType =
+                    android.widget.ImageView.ScaleType.CENTER_INSIDE
+
+                adjustViewBounds = true
             }
 
-        /*
-         * RGB separado em três TextViews para manter
-         * a identidade visual sem depender de drawable externo.
-         */
-
-        val rgb =
-            LinearLayout(this).apply {
-
-                orientation =
-                    LinearLayout.HORIZONTAL
-
-                gravity =
-                    Gravity.CENTER
-            }
-
-        val r =
-            TextView(this).apply {
-                text = "R"
-                textSize = 42f
-                setTextColor(vermelho)
-                typeface =
-                    Typeface.DEFAULT_BOLD
-            }
-
-        val g =
-            TextView(this).apply {
-                text = "G"
-                textSize = 42f
-                setTextColor(verde)
-                typeface =
-                    Typeface.DEFAULT_BOLD
-            }
-
-        val b =
-            TextView(this).apply {
-                text = "B"
-                textSize = 42f
-                setTextColor(azul)
-                typeface =
-                    Typeface.DEFAULT_BOLD
-            }
-
-        rgb.addView(r)
-        rgb.addView(g)
-        rgb.addView(b)
-
-        /*
-         * Mantém "PLAY" branco abaixo do RGB.
-         */
-
-        val play =
-            TextView(this).apply {
-
-                text = "— PLAY —"
-
-                textSize = 15f
-
-                setTextColor(branco)
-
-                gravity =
-                    Gravity.CENTER
-
-                typeface =
-                    Typeface.DEFAULT_BOLD
-            }
-
-        caixa.addView(rgb)
-        caixa.addView(play)
+        caixa.addView(
+            logo,
+            LinearLayout.LayoutParams(
+                -1,
+                150
+            )
+        )
 
         val subtitulo =
             TextView(this).apply {
 
-                text = "GESTÃO DE CLIENTES"
+                text =
+                    "GESTÃO DE CLIENTES"
 
                 textSize = 12f
 
-                setTextColor(cinza)
+                setTextColor(
+                    cinza
+                )
 
                 gravity =
                     Gravity.CENTER
@@ -612,7 +544,9 @@ class MainActivity : Activity() {
                 )
             }
 
-        caixa.addView(subtitulo)
+        caixa.addView(
+            subtitulo
+        )
 
         return caixa
     }

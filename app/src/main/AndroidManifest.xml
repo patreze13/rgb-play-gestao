@@ -4,6 +4,8 @@
     <application
         android:allowBackup="true"
         android:label="RGB Play Gestão"
+        android:icon="@drawable/icone_rgb"
+        android:roundIcon="@drawable/icone_rgb"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
