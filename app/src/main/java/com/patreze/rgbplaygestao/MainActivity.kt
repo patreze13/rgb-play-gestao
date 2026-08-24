@@ -481,7 +481,7 @@ class MainActivity : Activity() {
 
             hint = dica
 
-            hintTextColors =
+            hintTextColor =
                 android.content.res.ColorStateList.valueOf(
                     Color.rgb(130, 130, 130)
                 )
