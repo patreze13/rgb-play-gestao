@@ -1,6 +1,8 @@
 package com.patreze.rgbplaygestao
 
 import android.app.Activity
+import android.Manifest
+import android.content.pm.PackageManager
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
@@ -61,7 +63,34 @@ class MainActivity : Activity() {
         window.statusBarColor = Color.BLACK
         window.navigationBarColor = Color.BLACK
 
+        AgendamentoVencimentos.iniciar(this)
+
+        solicitarPermissaoNotificacao()
+
         mostrarInicio()
+    }
+
+    private fun solicitarPermissaoNotificacao() {
+
+        if (
+            android.os.Build.VERSION.SDK_INT >=
+            android.os.Build.VERSION_CODES.TIRAMISU
+        ) {
+
+            if (
+                checkSelfPermission(
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+
+                requestPermissions(
+                    arrayOf(
+                        Manifest.permission.POST_NOTIFICATIONS
+                    ),
+                    200
+                )
+            }
+        }
     }
 
     // ============================================================

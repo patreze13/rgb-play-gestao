@@ -10,7 +10,6 @@ object NotificacaoVencimento {
 
     private const val CANAL_ID = "vencimentos"
     private const val CANAL_NOME = "Vencimentos"
-    private const val NOTIFICACAO_ID = 1001
 
     fun criarCanal(context: Context) {
 
@@ -70,8 +69,12 @@ object NotificacaoVencimento {
                 Context.NOTIFICATION_SERVICE
             ) as NotificationManager
 
+        val id =
+            (System.currentTimeMillis() % Int.MAX_VALUE)
+                .toInt()
+
         manager.notify(
-            NOTIFICACAO_ID,
+            id,
             notification
         )
     }
