@@ -1498,61 +1498,44 @@ class MainActivity : Activity() {
         contato: String
     ) {
 
-        var numero =
-            contato.filter {
-                it.isDigit()
-            }
-
-        if (
-            numero.length == 10 ||
-            numero.length == 11
-        ) {
-
-            numero =
-                "55$numero"
+        var numero = contato.filter {
+            it.isDigit()
         }
 
-        if (
-            numero.length < 12
-        ) {
+        if (numero.length == 10 || numero.length == 11) {
+            numero = "55$numero"
+        }
 
+        if (numero.length < 12) {
             Toast.makeText(
                 this,
                 "Número de WhatsApp inválido.",
                 Toast.LENGTH_SHORT
             ).show()
-
             return
         }
 
         try {
 
-            val url =
-                "https://wa.me/$numero"
+            val whatsappIntent = Intent(
+                Intent.ACTION_VIEW,
+                Uri.parse("https://wa.me/$numero")
+            )
 
-            val intent =
-                Intent(
+            whatsappIntent.setPackage("com.whatsapp")
+
+            try {
+
+                startActivity(whatsappIntent)
+
+            } catch (_: Exception) {
+
+                val browserIntent = Intent(
                     Intent.ACTION_VIEW,
-                    Uri.parse(url)
+                    Uri.parse("https://wa.me/$numero")
                 )
 
-            if (
-                intent.resolveActivity(
-                    packageManager
-                ) != null
-            ) {
-
-                startActivity(
-                    intent
-                )
-
-            } else {
-
-                Toast.makeText(
-                    this,
-                    "Não foi possível abrir o WhatsApp.",
-                    Toast.LENGTH_SHORT
-                ).show()
+                startActivity(browserIntent)
             }
 
         } catch (_: Exception) {
