@@ -960,7 +960,7 @@ class MainActivity : Activity() {
         val larguraCampo =
             LinearLayout.LayoutParams(
                 -1,
-                62
+                150
             ).apply {
                 topMargin = 6
                 bottomMargin = 6
@@ -975,7 +975,7 @@ class MainActivity : Activity() {
             contato,
             LinearLayout.LayoutParams(
                 -1,
-                62
+                150
             ).apply {
                 topMargin = 6
                 bottomMargin = 6
@@ -986,7 +986,7 @@ class MainActivity : Activity() {
             dia,
             LinearLayout.LayoutParams(
                 -1,
-                62
+                150
             ).apply {
                 topMargin = 6
                 bottomMargin = 6
@@ -1381,7 +1381,7 @@ class MainActivity : Activity() {
             contato,
             LinearLayout.LayoutParams(
                 -1,
-                72
+                150
             )
         )
 
