@@ -1,17 +1,16 @@
 package com.patreze.rgbplaygestao
 
+import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
-import android.view.View
 import android.view.ViewGroup
 import android.widget.*
-import androidx.appcompat.app.AppCompatActivity
-import java.text.SimpleDateFormat
-import java.util.*
+import android.graphics.drawable.GradientDrawable
+import java.util.Calendar
 import kotlin.math.max
 
 data class Cliente(
@@ -20,7 +19,7 @@ data class Cliente(
     var dia: Int
 )
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
 
     private val preto = Color.rgb(8, 8, 8)
     private val branco = Color.WHITE
@@ -43,10 +42,6 @@ class MainActivity : AppCompatActivity() {
         carregarClientes()
         mostrarInicio()
     }
-
-    // ============================================================
-    // CONFIGURAÇÃO GERAL
-    // ============================================================
 
     private fun configurarTela() {
 
@@ -98,20 +93,18 @@ class MainActivity : AppCompatActivity() {
         return EditText(this).apply {
 
             hint = dica
-            hintTextColors =
-                android.content.res.ColorStateList.valueOf(
-                    Color.rgb(130, 130, 130)
-                )
+            setHintTextColor(Color.rgb(130, 130, 130))
 
             setTextColor(branco)
             textSize = 16f
-            singleLine = true
+            setSingleLine(true)
 
             setPadding(24, 0, 24, 0)
 
-            setBackgroundColor(
-                Color.rgb(25, 25, 25)
-            )
+            background = GradientDrawable().apply {
+                setColor(Color.rgb(25, 25, 25))
+                cornerRadius = 18f
+            }
 
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -138,7 +131,7 @@ class MainActivity : AppCompatActivity() {
 
             setPadding(18, 0, 18, 0)
 
-            background = android.graphics.drawable.GradientDrawable().apply {
+            background = GradientDrawable().apply {
                 setColor(Color.rgb(18, 18, 18))
                 setStroke(3, cor)
                 cornerRadius = 22f
@@ -160,7 +153,6 @@ class MainActivity : AppCompatActivity() {
     private fun espaco(pixels: Int): Space {
 
         return Space(this).apply {
-
             layoutParams = LinearLayout.LayoutParams(
                 1,
                 pixels
@@ -198,7 +190,6 @@ class MainActivity : AppCompatActivity() {
             subtitulo("GESTÃO DE CLIENTES")
         )
 
-        // Este peso mantém os botões centralizados
         val areaBotoes = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -266,9 +257,7 @@ class MainActivity : AppCompatActivity() {
         tela.addView(contato)
         tela.addView(dia)
 
-        tela.addView(
-            espaco(10)
-        )
+        tela.addView(espaco(10))
 
         tela.addView(
             botao("SALVAR CLIENTE", verde) {
@@ -347,7 +336,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val lista = clientes.sortedBy {
-            proximoVencimento(it.dia)
+            proximoVencimento(it.dia).timeInMillis
         }
 
         val scroll = ScrollView(this)
@@ -369,27 +358,25 @@ class MainActivity : AppCompatActivity() {
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(22, 12, 22, 12)
 
-                background =
-                    android.graphics.drawable.GradientDrawable().apply {
-                        setColor(Color.rgb(20, 20, 20))
-                        setStroke(
-                            1,
-                            Color.rgb(55, 55, 55)
-                        )
-                        cornerRadius = 18f
-                    }
+                background = GradientDrawable().apply {
+                    setColor(Color.rgb(20, 20, 20))
+                    setStroke(
+                        1,
+                        Color.rgb(55, 55, 55)
+                    )
+                    cornerRadius = 18f
+                }
 
                 setOnClickListener {
                     mostrarDetalhes(cliente)
                 }
 
-                layoutParams =
-                    LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        72
-                    ).apply {
-                        setMargins(0, 0, 0, 10)
-                    }
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    72
+                ).apply {
+                    setMargins(0, 0, 0, 10)
+                }
             }
 
             conteudo.addView(bloco)
@@ -421,21 +408,19 @@ class MainActivity : AppCompatActivity() {
 
         configurarTela()
 
-        tela.addView(
-            titulo(cliente.nome)
-        )
+        tela.addView(titulo(cliente.nome))
 
         tela.addView(
             subtitulo("INFORMAÇÕES DO CLIENTE")
         )
 
-        val info = TextView(this).apply {
+        val contato = if (cliente.contato.isBlank()) {
+            "Não informado"
+        } else {
+            cliente.contato
+        }
 
-            val contato =
-                if (cliente.contato.isBlank())
-                    "Não informado"
-                else
-                    cliente.contato
+        val info = TextView(this).apply {
 
             text =
                 "Nome\n${cliente.nome}\n\n" +
@@ -446,23 +431,21 @@ class MainActivity : AppCompatActivity() {
             textSize = 16f
             setPadding(24, 24, 24, 24)
 
-            background =
-                android.graphics.drawable.GradientDrawable().apply {
-                    setColor(Color.rgb(20, 20, 20))
-                    setStroke(
-                        2,
-                        Color.rgb(45, 45, 45)
-                    )
-                    cornerRadius = 20f
-                }
+            background = GradientDrawable().apply {
+                setColor(Color.rgb(20, 20, 20))
+                setStroke(
+                    2,
+                    Color.rgb(45, 45, 45)
+                )
+                cornerRadius = 20f
+            }
 
-            layoutParams =
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    setMargins(0, 0, 0, 18)
-                }
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, 18)
+            }
         }
 
         tela.addView(info)
@@ -471,10 +454,7 @@ class MainActivity : AppCompatActivity() {
 
             tela.addView(
                 botao("ABRIR WHATSAPP", verde) {
-
-                    abrirWhatsApp(
-                        cliente.contato
-                    )
+                    abrirWhatsApp(cliente.contato)
                 }
             )
         }
@@ -501,13 +481,18 @@ class MainActivity : AppCompatActivity() {
         val hoje = Calendar.getInstance()
 
         val proximos = clientes.map {
+
             val data = proximoVencimento(it.dia)
             val dias = diasEntre(hoje, data)
 
             Pair(it, dias)
+
         }.filter {
+
             it.second in 0..3
+
         }.sortedBy {
+
             it.second
         }
 
@@ -546,23 +531,21 @@ class MainActivity : AppCompatActivity() {
                     gravity = Gravity.CENTER_VERTICAL
                     setPadding(22, 12, 22, 12)
 
-                    background =
-                        android.graphics.drawable.GradientDrawable().apply {
-                            setColor(Color.rgb(20, 20, 20))
-                            setStroke(
-                                2,
-                                azul
-                            )
-                            cornerRadius = 18f
-                        }
+                    background = GradientDrawable().apply {
+                        setColor(Color.rgb(20, 20, 20))
+                        setStroke(
+                            2,
+                            azul
+                        )
+                        cornerRadius = 18f
+                    }
 
-                    layoutParams =
-                        LinearLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            72
-                        ).apply {
-                            setMargins(0, 0, 0, 10)
-                        }
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        72
+                    ).apply {
+                        setMargins(0, 0, 0, 10)
+                    }
                 }
 
                 conteudo.addView(bloco)
@@ -595,14 +578,13 @@ class MainActivity : AppCompatActivity() {
 
         val hoje = Calendar.getInstance()
 
-        val resultado =
-            Calendar.getInstance().apply {
-                set(
-                    hoje.get(Calendar.YEAR),
-                    hoje.get(Calendar.MONTH),
-                    1
-                )
-            }
+        val resultado = Calendar.getInstance().apply {
+            set(
+                hoje.get(Calendar.YEAR),
+                hoje.get(Calendar.MONTH),
+                1
+            )
+        }
 
         val ultimoDia =
             resultado.getActualMaximum(
@@ -642,10 +624,7 @@ class MainActivity : AppCompatActivity() {
 
         val inicio = Calendar.getInstance().apply {
             timeInMillis = hoje.timeInMillis
-            set(
-                Calendar.HOUR_OF_DAY,
-                0
-            )
+            set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
@@ -653,18 +632,15 @@ class MainActivity : AppCompatActivity() {
 
         val fim = Calendar.getInstance().apply {
             timeInMillis = data.timeInMillis
-            set(
-                Calendar.HOUR_OF_DAY,
-                0
-            )
+            set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }
 
         return (
-            (fim.timeInMillis - inicio.timeInMillis)
-                / (24 * 60 * 60 * 1000)
+            (fim.timeInMillis - inicio.timeInMillis) /
+                (24 * 60 * 60 * 1000)
             ).toInt()
     }
 
@@ -680,10 +656,11 @@ class MainActivity : AppCompatActivity() {
             }
 
         val numeroFinal =
-            if (somenteNumeros.startsWith("55"))
+            if (somenteNumeros.startsWith("55")) {
                 somenteNumeros
-            else
+            } else {
                 "55$somenteNumeros"
+            }
 
         try {
 
@@ -712,11 +689,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun salvarClientes() {
 
-        val preferencias =
-            getSharedPreferences(
-                "rgb_play",
-                MODE_PRIVATE
-            )
+        val preferencias = getSharedPreferences(
+            "rgb_play",
+            MODE_PRIVATE
+        )
 
         val editor = preferencias.edit()
 
@@ -750,11 +726,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun carregarClientes() {
 
-        val preferencias =
-            getSharedPreferences(
-                "rgb_play",
-                MODE_PRIVATE
-            )
+        val preferencias = getSharedPreferences(
+            "rgb_play",
+            MODE_PRIVATE
+        )
 
         val quantidade =
             preferencias.getInt(
