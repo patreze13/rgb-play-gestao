@@ -307,7 +307,7 @@ class MainActivity : Activity() {
 
         scroll.addView(
             conteudo,
-            ScrollView.LayoutParams(
+            LinearLayout.LayoutParams(
                 -1,
                 -1
             )
