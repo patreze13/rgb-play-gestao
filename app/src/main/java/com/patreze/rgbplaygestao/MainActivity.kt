@@ -4,22 +4,23 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
-import android.view.View
-import android.view.ViewGroup
-import android.widget.*
-
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.Space
+import android.widget.TextView
+import android.widget.Toast
 import org.json.JSONArray
 import org.json.JSONObject
-
 import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 
 data class Cliente(
@@ -30,7 +31,7 @@ data class Cliente(
 
 class MainActivity : Activity() {
 
-    private val fundo = Color.rgb(0, 0, 0)
+    private val fundo = Color.BLACK
     private val branco = Color.WHITE
     private val cinza = Color.rgb(180, 180, 180)
 
@@ -38,10 +39,11 @@ class MainActivity : Activity() {
     private val verde = Color.rgb(50, 210, 100)
     private val azul = Color.rgb(60, 130, 255)
 
-    private val lilas = Color.rgb(190, 150, 255)
-
     private val preferencias by lazy {
-        getSharedPreferences("rgb_play_gestao", Context.MODE_PRIVATE)
+        getSharedPreferences(
+            "rgb_play_gestao",
+            Context.MODE_PRIVATE
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,14 +63,19 @@ class MainActivity : Activity() {
 
         val lista = mutableListOf<Cliente>()
 
-        val texto = preferencias.getString("clientes", "[]") ?: "[]"
+        val texto = preferencias.getString(
+            "clientes",
+            "[]"
+        ) ?: "[]"
 
         try {
+
             val array = JSONArray(texto)
 
             for (i in 0 until array.length()) {
 
-                val objeto = array.getJSONObject(i)
+                val objeto =
+                    array.getJSONObject(i)
 
                 lista.add(
                     Cliente(
@@ -85,7 +92,9 @@ class MainActivity : Activity() {
         return lista
     }
 
-    private fun salvarClientes(clientes: List<Cliente>) {
+    private fun salvarClientes(
+        clientes: List<Cliente>
+    ) {
 
         val array = JSONArray()
 
@@ -93,16 +102,30 @@ class MainActivity : Activity() {
 
             val objeto = JSONObject()
 
-            objeto.put("nome", cliente.nome)
-            objeto.put("contato", cliente.contato)
-            objeto.put("dia", cliente.dia)
+            objeto.put(
+                "nome",
+                cliente.nome
+            )
+
+            objeto.put(
+                "contato",
+                cliente.contato
+            )
+
+            objeto.put(
+                "dia",
+                cliente.dia
+            )
 
             array.put(objeto)
         }
 
         preferencias
             .edit()
-            .putString("clientes", array.toString())
+            .putString(
+                "clientes",
+                array.toString()
+            )
             .apply()
     }
 
@@ -110,14 +133,17 @@ class MainActivity : Activity() {
     // VENCIMENTOS
     // ============================================================
 
-    private fun proximoVencimento(dia: Int): Calendar {
+    private fun proximoVencimento(
+        dia: Int
+    ): Calendar {
 
         val hoje = Calendar.getInstance()
 
         val ano = hoje.get(Calendar.YEAR)
         val mes = hoje.get(Calendar.MONTH)
 
-        val tentativa = Calendar.getInstance()
+        val tentativa =
+            Calendar.getInstance()
 
         tentativa.set(
             ano,
@@ -128,9 +154,15 @@ class MainActivity : Activity() {
             0
         )
 
-        tentativa.set(Calendar.MILLISECOND, 0)
+        tentativa.set(
+            Calendar.MILLISECOND,
+            0
+        )
 
-        val ultimoDia = tentativa.getActualMaximum(Calendar.DAY_OF_MONTH)
+        val ultimoDia =
+            tentativa.getActualMaximum(
+                Calendar.DAY_OF_MONTH
+            )
 
         tentativa.set(
             ano,
@@ -141,16 +173,24 @@ class MainActivity : Activity() {
             0
         )
 
-        tentativa.set(Calendar.MILLISECOND, 0)
+        tentativa.set(
+            Calendar.MILLISECOND,
+            0
+        )
 
         if (!tentativa.before(hoje)) {
             return tentativa
         }
 
-        tentativa.add(Calendar.MONTH, 1)
+        tentativa.add(
+            Calendar.MONTH,
+            1
+        )
 
         val novoUltimoDia =
-            tentativa.getActualMaximum(Calendar.DAY_OF_MONTH)
+            tentativa.getActualMaximum(
+                Calendar.DAY_OF_MONTH
+            )
 
         tentativa.set(
             tentativa.get(Calendar.YEAR),
@@ -161,14 +201,20 @@ class MainActivity : Activity() {
             0
         )
 
-        tentativa.set(Calendar.MILLISECOND, 0)
+        tentativa.set(
+            Calendar.MILLISECOND,
+            0
+        )
 
         return tentativa
     }
 
-    private fun diasAte(calendario: Calendar): Long {
+    private fun diasAte(
+        calendario: Calendar
+    ): Long {
 
-        val hoje = Calendar.getInstance()
+        val hoje =
+            Calendar.getInstance()
 
         hoje.set(
             hoje.get(Calendar.YEAR),
@@ -179,9 +225,13 @@ class MainActivity : Activity() {
             0
         )
 
-        hoje.set(Calendar.MILLISECOND, 0)
+        hoje.set(
+            Calendar.MILLISECOND,
+            0
+        )
 
-        val data = calendario.clone() as Calendar
+        val data =
+            calendario.clone() as Calendar
 
         data.set(
             data.get(Calendar.YEAR),
@@ -192,31 +242,48 @@ class MainActivity : Activity() {
             0
         )
 
-        data.set(Calendar.MILLISECOND, 0)
+        data.set(
+            Calendar.MILLISECOND,
+            0
+        )
 
-        return (data.timeInMillis - hoje.timeInMillis) /
-                (1000L * 60L * 60L * 24L)
+        return (
+            data.timeInMillis -
+                hoje.timeInMillis
+            ) / (
+            1000L *
+                60L *
+                60L *
+                24L
+            )
     }
 
-    private fun formatarData(calendario: Calendar): String {
+    private fun formatarData(
+        calendario: Calendar
+    ): String {
 
         return SimpleDateFormat(
             "dd/MM/yyyy",
             Locale("pt", "BR")
-        ).format(calendario.time)
+        ).format(
+            calendario.time
+        )
     }
 
     // ============================================================
     // BASE VISUAL
     // ============================================================
 
-    private fun telaBase(): LinearLayout {
+    private fun telaBase():
+            LinearLayout {
 
         return LinearLayout(this).apply {
 
-            orientation = LinearLayout.VERTICAL
+            orientation =
+                LinearLayout.VERTICAL
 
-            gravity = Gravity.CENTER_HORIZONTAL
+            gravity =
+                Gravity.CENTER_HORIZONTAL
 
             setBackgroundColor(fundo)
 
@@ -244,9 +311,15 @@ class MainActivity : Activity() {
 
             gravity = Gravity.CENTER
 
-            typeface = Typeface.DEFAULT_BOLD
+            typeface =
+                Typeface.DEFAULT_BOLD
 
-            setPadding(8, 8, 8, 24)
+            setPadding(
+                8,
+                8,
+                8,
+                24
+            )
         }
     }
 
@@ -282,9 +355,16 @@ class MainActivity : Activity() {
 
         view.text = texto
         view.textSize = 16f
-        view.setTextColor(Color.WHITE)
-        view.gravity = Gravity.CENTER
-        view.typeface = Typeface.DEFAULT_BOLD
+
+        view.setTextColor(
+            Color.WHITE
+        )
+
+        view.gravity =
+            Gravity.CENTER
+
+        view.typeface =
+            Typeface.DEFAULT_BOLD
 
         view.setPadding(
             16,
@@ -293,17 +373,22 @@ class MainActivity : Activity() {
             18
         )
 
-        view.background = android.graphics.drawable.GradientDrawable().apply {
+        view.background =
+            android.graphics.drawable
+                .GradientDrawable()
+                .apply {
 
-            setColor(Color.BLACK)
+                    setColor(
+                        Color.BLACK
+                    )
 
-            setStroke(
-                3,
-                corBorda
-            )
+                    setStroke(
+                        3,
+                        corBorda
+                    )
 
-            cornerRadius = 18f
-        }
+                    cornerRadius = 18f
+                }
 
         view.setOnClickListener {
             acao()
@@ -329,56 +414,66 @@ class MainActivity : Activity() {
     }
 
     // ============================================================
-    // TELA INICIAL
+    // INÍCIO
     // ============================================================
 
     private fun mostrarInicio() {
 
         val tela = telaBase()
 
-        val scroll = ScrollView(this).apply {
-            setBackgroundColor(fundo)
-        }
+        val scroll =
+            ScrollView(this)
 
-        val conteudo = telaBase()
+        val conteudo =
+            telaBase()
 
-        val logo = TextView(this).apply {
+        val logo =
+            TextView(this).apply {
 
-            text = "RGB PLAY"
+                text = "RGB PLAY"
 
-            textSize = 34f
+                textSize = 34f
 
-            setTextColor(branco)
+                setTextColor(
+                    branco
+                )
 
-            gravity = Gravity.CENTER
+                gravity =
+                    Gravity.CENTER
 
-            typeface = Typeface.DEFAULT_BOLD
+                typeface =
+                    Typeface.DEFAULT_BOLD
 
-            setPadding(
-                8,
-                10,
-                8,
-                4
-            )
-        }
+                setPadding(
+                    8,
+                    10,
+                    8,
+                    4
+                )
+            }
 
-        val subtitulo = TextView(this).apply {
+        val subtitulo =
+            TextView(this).apply {
 
-            text = "GESTÃO DE CLIENTES"
+                text =
+                    "GESTÃO DE CLIENTES"
 
-            textSize = 14f
+                textSize = 14f
 
-            setTextColor(cinza)
+                setTextColor(
+                    cinza
+                )
 
-            gravity = Gravity.CENTER
+                gravity =
+                    Gravity.CENTER
 
-            setPadding(
-                8,
-                0,
-                8,
-                35
-            )
-        }
+                setPadding(
+                    8,
+                    0,
+                    8,
+                    35
+                )
+            }
 
         conteudo.addView(
             logo,
@@ -396,7 +491,7 @@ class MainActivity : Activity() {
             )
         )
 
-        val botaoAdicionar =
+        val adicionar =
             botao(
                 "ADICIONAR CLIENTE",
                 vermelho
@@ -404,7 +499,7 @@ class MainActivity : Activity() {
                 mostrarAdicionarCliente()
             }
 
-        val botaoClientes =
+        val clientes =
             botao(
                 "VER CLIENTES",
                 verde
@@ -412,7 +507,7 @@ class MainActivity : Activity() {
                 mostrarClientes()
             }
 
-        val botaoVencimentos =
+        val vencimentos =
             botao(
                 "PRÓXIMOS VENCIMENTOS",
                 azul
@@ -421,7 +516,7 @@ class MainActivity : Activity() {
             }
 
         conteudo.addView(
-            botaoAdicionar,
+            adicionar,
             LinearLayout.LayoutParams(
                 -1,
                 72
@@ -434,7 +529,7 @@ class MainActivity : Activity() {
         )
 
         conteudo.addView(
-            botaoClientes,
+            clientes,
             LinearLayout.LayoutParams(
                 -1,
                 72
@@ -447,14 +542,16 @@ class MainActivity : Activity() {
         )
 
         conteudo.addView(
-            botaoVencimentos,
+            vencimentos,
             LinearLayout.LayoutParams(
                 -1,
                 72
             )
         )
 
-        scroll.addView(conteudo)
+        scroll.addView(
+            conteudo
+        )
 
         tela.addView(
             scroll,
@@ -469,24 +566,32 @@ class MainActivity : Activity() {
     }
 
     // ============================================================
-    // CAMPOS
+    // CAMPO
     // ============================================================
 
     private fun campo(
         dica: String,
-        tipo: Int = InputType.TYPE_CLASS_TEXT
+        tipo: Int =
+            InputType.TYPE_CLASS_TEXT
     ): EditText {
 
         return EditText(this).apply {
 
             hint = dica
 
-            hintTextColor =
-                android.content.res.ColorStateList.valueOf(
-                    Color.rgb(130, 130, 130)
+            setHintTextColor(
+                ColorStateList.valueOf(
+                    Color.rgb(
+                        130,
+                        130,
+                        130
+                    )
                 )
+            )
 
-            setTextColor(branco)
+            setTextColor(
+                branco
+            )
 
             textSize = 16f
 
@@ -502,48 +607,50 @@ class MainActivity : Activity() {
             )
 
             background =
-                android.graphics.drawable.GradientDrawable().apply {
+                android.graphics.drawable
+                    .GradientDrawable()
+                    .apply {
 
-                    setColor(
-                        Color.rgb(
-                            18,
-                            18,
-                            18
+                        setColor(
+                            Color.rgb(
+                                18,
+                                18,
+                                18
+                            )
                         )
-                    )
 
-                    setStroke(
-                        1,
-                        Color.rgb(
-                            80,
-                            80,
-                            80
+                        setStroke(
+                            1,
+                            Color.rgb(
+                                80,
+                                80,
+                                80
+                            )
                         )
-                    )
 
-                    cornerRadius = 14f
-                }
+                        cornerRadius = 14f
+                    }
         }
     }
 
     // ============================================================
-    // ADICIONAR CLIENTE
+    // ADICIONAR / EDITAR
     // ============================================================
 
     private fun mostrarAdicionarCliente(
         clienteExistente: Cliente? = null
     ) {
 
-        val editando = clienteExistente != null
+        val editando =
+            clienteExistente != null
 
         val tela = telaBase()
 
-        val scroll = ScrollView(this)
+        val scroll =
+            ScrollView(this)
 
-        val conteudo = telaBase()
-
-        conteudo.gravity =
-            Gravity.CENTER_HORIZONTAL
+        val conteudo =
+            telaBase()
 
         conteudo.addView(
             titulo(
@@ -551,26 +658,25 @@ class MainActivity : Activity() {
                     "EDITAR CLIENTE"
                 else
                     "ADICIONAR CLIENTE"
-            ),
-            LinearLayout.LayoutParams(
-                -1,
-                -2
             )
         )
 
-        val nome = campo(
-            "Nome do cliente"
-        )
+        val nome =
+            campo(
+                "Nome do cliente"
+            )
 
-        val contato = campo(
-            "Contato / WhatsApp",
-            InputType.TYPE_CLASS_PHONE
-        )
+        val contato =
+            campo(
+                "Contato / WhatsApp",
+                InputType.TYPE_CLASS_PHONE
+            )
 
-        val dia = campo(
-            "Dia da contratação (1 a 31)",
-            InputType.TYPE_CLASS_NUMBER
-        )
+        val dia =
+            campo(
+                "Dia da contratação (1 a 31)",
+                InputType.TYPE_CLASS_NUMBER
+            )
 
         if (clienteExistente != null) {
 
@@ -639,13 +745,19 @@ class MainActivity : Activity() {
             ) {
 
                 val nomeTexto =
-                    nome.text.toString().trim()
+                    nome.text
+                        .toString()
+                        .trim()
 
                 val contatoTexto =
-                    contato.text.toString().trim()
+                    contato.text
+                        .toString()
+                        .trim()
 
                 val diaTexto =
-                    dia.text.toString().trim()
+                    dia.text
+                        .toString()
+                        .trim()
 
                 if (nomeTexto.isEmpty()) {
 
@@ -682,6 +794,7 @@ class MainActivity : Activity() {
 
                     val duplicado =
                         clientes.any {
+
                             it.nome.equals(
                                 nomeTexto,
                                 ignoreCase = true
@@ -714,7 +827,8 @@ class MainActivity : Activity() {
 
                     val cliente =
                         clientes.find {
-                            it.nome == antigo.nome
+                            it.nome ==
+                                antigo.nome
                         }
 
                     if (cliente != null) {
@@ -730,7 +844,9 @@ class MainActivity : Activity() {
                     }
                 }
 
-                salvarClientes(clientes)
+                salvarClientes(
+                    clientes
+                )
 
                 Toast.makeText(
                     this,
@@ -777,7 +893,9 @@ class MainActivity : Activity() {
             )
         )
 
-        scroll.addView(conteudo)
+        scroll.addView(
+            conteudo
+        )
 
         tela.addView(
             scroll,
@@ -792,19 +910,18 @@ class MainActivity : Activity() {
     }
 
     // ============================================================
-    // LISTA DE CLIENTES
+    // CLIENTES
     // ============================================================
 
     private fun mostrarClientes() {
 
         val tela = telaBase()
 
-        val scroll = ScrollView(this)
+        val scroll =
+            ScrollView(this)
 
-        val conteudo = telaBase()
-
-        conteudo.gravity =
-            Gravity.TOP or Gravity.CENTER_HORIZONTAL
+        val conteudo =
+            telaBase()
 
         conteudo.addView(
             titulo(
@@ -818,8 +935,9 @@ class MainActivity : Activity() {
 
         clientes.sortWith(
             compareBy {
-                proximoVencimento(it.dia)
-                    .timeInMillis
+                proximoVencimento(
+                    it.dia
+                ).timeInMillis
             }
         )
 
@@ -829,10 +947,6 @@ class MainActivity : Activity() {
                 texto(
                     "Nenhum cliente cadastrado.",
                     17f
-                ),
-                LinearLayout.LayoutParams(
-                    -1,
-                    -2
                 )
             )
 
@@ -860,6 +974,11 @@ class MainActivity : Activity() {
             }
         }
 
+        adicionarEspaco(
+            conteudo,
+            20
+        )
+
         val voltar =
             botao(
                 "VOLTAR",
@@ -872,11 +991,6 @@ class MainActivity : Activity() {
                 mostrarInicio()
             }
 
-        adicionarEspaco(
-            conteudo,
-            20
-        )
-
         conteudo.addView(
             voltar,
             LinearLayout.LayoutParams(
@@ -885,7 +999,9 @@ class MainActivity : Activity() {
             )
         )
 
-        scroll.addView(conteudo)
+        scroll.addView(
+            conteudo
+        )
 
         tela.addView(
             scroll,
@@ -904,7 +1020,9 @@ class MainActivity : Activity() {
     ): TextView {
 
         val vencimento =
-            proximoVencimento(cliente.dia)
+            proximoVencimento(
+                cliente.dia
+            )
 
         val data =
             SimpleDateFormat(
@@ -921,9 +1039,12 @@ class MainActivity : Activity() {
 
             textSize = 15f
 
-            setTextColor(branco)
+            setTextColor(
+                branco
+            )
 
-            gravity = Gravity.CENTER_VERTICAL
+            gravity =
+                Gravity.CENTER_VERTICAL
 
             setPadding(
                 18,
@@ -933,23 +1054,25 @@ class MainActivity : Activity() {
             )
 
             background =
-                android.graphics.drawable.GradientDrawable().apply {
+                android.graphics.drawable
+                    .GradientDrawable()
+                    .apply {
 
-                    setColor(
-                        Color.rgb(
-                            15,
-                            15,
-                            15
+                        setColor(
+                            Color.rgb(
+                                15,
+                                15,
+                                15
+                            )
                         )
-                    )
 
-                    setStroke(
-                        2,
-                        verde
-                    )
+                        setStroke(
+                            2,
+                            verde
+                        )
 
-                    cornerRadius = 12f
-                }
+                        cornerRadius = 12f
+                    }
 
             setOnClickListener {
 
@@ -970,12 +1093,11 @@ class MainActivity : Activity() {
 
         val tela = telaBase()
 
-        val scroll = ScrollView(this)
+        val scroll =
+            ScrollView(this)
 
-        val conteudo = telaBase()
-
-        conteudo.gravity =
-            Gravity.TOP or Gravity.CENTER_HORIZONTAL
+        val conteudo =
+            telaBase()
 
         conteudo.addView(
             titulo(
@@ -985,18 +1107,24 @@ class MainActivity : Activity() {
         )
 
         val vencimento =
-            proximoVencimento(cliente.dia)
+            proximoVencimento(
+                cliente.dia
+            )
 
         val dias =
-            diasAte(vencimento)
+            diasAte(
+                vencimento
+            )
 
         conteudo.addView(
             texto(
                 "Contato\n" +
-                        if (cliente.contato.isEmpty())
-                            "Não informado"
-                        else
-                            cliente.contato,
+                    if (
+                        cliente.contato.isEmpty()
+                    )
+                        "Não informado"
+                    else
+                        cliente.contato,
                 16f
             )
         )
@@ -1004,7 +1132,7 @@ class MainActivity : Activity() {
         conteudo.addView(
             texto(
                 "Dia da contratação\n" +
-                        "Todo dia ${cliente.dia}",
+                    "Todo dia ${cliente.dia}",
                 16f
             )
         )
@@ -1012,12 +1140,17 @@ class MainActivity : Activity() {
         conteudo.addView(
             texto(
                 "Próximo vencimento\n" +
-                        "${formatarData(vencimento)}\n" +
-                        when (dias) {
-                            0L -> "Vence hoje"
-                            1L -> "Vence amanhã"
-                            else -> "Faltam $dias dias"
-                        },
+                    "${formatarData(vencimento)}\n" +
+                    when (dias) {
+                        0L ->
+                            "Vence hoje"
+
+                        1L ->
+                            "Vence amanhã"
+
+                        else ->
+                            "Faltam $dias dias"
+                    },
                 16f
             )
         )
@@ -1027,7 +1160,9 @@ class MainActivity : Activity() {
             20
         )
 
-        if (cliente.contato.isNotEmpty()) {
+        if (
+            cliente.contato.isNotEmpty()
+        ) {
 
             val whatsapp =
                 botao(
@@ -1123,7 +1258,9 @@ class MainActivity : Activity() {
             )
         )
 
-        scroll.addView(conteudo)
+        scroll.addView(
+            conteudo
+        )
 
         tela.addView(
             scroll,
@@ -1150,7 +1287,8 @@ class MainActivity : Activity() {
                 it.isDigit()
             }
 
-        if (numero.length == 10 ||
+        if (
+            numero.length == 10 ||
             numero.length == 11
         ) {
 
@@ -1168,7 +1306,9 @@ class MainActivity : Activity() {
                     )
                 )
 
-            startActivity(intent)
+            startActivity(
+                intent
+            )
 
         } catch (_: Exception) {
 
@@ -1189,7 +1329,9 @@ class MainActivity : Activity() {
     ) {
 
         AlertDialog.Builder(this)
-            .setTitle("Excluir cliente")
+            .setTitle(
+                "Excluir cliente"
+            )
             .setMessage(
                 "Deseja realmente excluir ${cliente.nome}?"
             )
@@ -1205,10 +1347,13 @@ class MainActivity : Activity() {
                     carregarClientes()
 
                 clientes.removeAll {
-                    it.nome == cliente.nome
+                    it.nome ==
+                        cliente.nome
                 }
 
-                salvarClientes(clientes)
+                salvarClientes(
+                    clientes
+                )
 
                 mostrarClientes()
             }
@@ -1223,12 +1368,11 @@ class MainActivity : Activity() {
 
         val tela = telaBase()
 
-        val scroll = ScrollView(this)
+        val scroll =
+            ScrollView(this)
 
-        val conteudo = telaBase()
-
-        conteudo.gravity =
-            Gravity.TOP or Gravity.CENTER_HORIZONTAL
+        val conteudo =
+            telaBase()
 
         conteudo.addView(
             titulo(
@@ -1237,17 +1381,19 @@ class MainActivity : Activity() {
             )
         )
 
-        val hoje = Calendar.getInstance()
-
         val clientes =
             carregarClientes()
                 .filter {
 
                     val vencimento =
-                        proximoVencimento(it.dia)
+                        proximoVencimento(
+                            it.dia
+                        )
 
                     val dias =
-                        diasAte(vencimento)
+                        diasAte(
+                            vencimento
+                        )
 
                     dias in 0L..3L
                 }
@@ -1277,7 +1423,9 @@ class MainActivity : Activity() {
                     )
 
                 val dias =
-                    diasAte(vencimento)
+                    diasAte(
+                        vencimento
+                    )
 
                 val data =
                     formatarData(
@@ -1289,16 +1437,24 @@ class MainActivity : Activity() {
 
                         text =
                             "${cliente.nome}\n" +
-                                    "$data  •  " +
-                                    when (dias) {
-                                        0L -> "HOJE"
-                                        1L -> "AMANHÃ"
-                                        else -> "$dias dias"
-                                    }
+                                "$data  •  " +
+                                when (dias) {
+
+                                    0L ->
+                                        "HOJE"
+
+                                    1L ->
+                                        "AMANHÃ"
+
+                                    else ->
+                                        "$dias dias"
+                                }
 
                         textSize = 15f
 
-                        setTextColor(branco)
+                        setTextColor(
+                            branco
+                        )
 
                         gravity =
                             Gravity.CENTER_VERTICAL
@@ -1311,23 +1467,26 @@ class MainActivity : Activity() {
                         )
 
                         background =
-                            android.graphics.drawable.GradientDrawable().apply {
+                            android.graphics.drawable
+                                .GradientDrawable()
+                                .apply {
 
-                                setColor(
-                                    Color.rgb(
-                                        15,
-                                        15,
-                                        15
+                                    setColor(
+                                        Color.rgb(
+                                            15,
+                                            15,
+                                            15
+                                        )
                                     )
-                                )
 
-                                setStroke(
-                                    2,
-                                    azul
-                                )
+                                    setStroke(
+                                        2,
+                                        azul
+                                    )
 
-                                cornerRadius = 12f
-                            }
+                                    cornerRadius =
+                                        12f
+                                }
 
                         setOnClickListener {
 
@@ -1378,7 +1537,9 @@ class MainActivity : Activity() {
             )
         )
 
-        scroll.addView(conteudo)
+        scroll.addView(
+            conteudo
+        )
 
         tela.addView(
             scroll,
@@ -1393,11 +1554,10 @@ class MainActivity : Activity() {
     }
 
     // ============================================================
-    // VOLTAR DO ANDROID
+    // BACK
     // ============================================================
 
     override fun onBackPressed() {
-
         mostrarInicio()
     }
 }
