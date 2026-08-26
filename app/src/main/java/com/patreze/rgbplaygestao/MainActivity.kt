@@ -1,30 +1,23 @@
 package com.patreze.rgbplaygestao
 
 import android.app.Activity
-import android.Manifest
-import android.content.pm.PackageManager
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
-import android.view.ViewGroup
 import android.text.Editable
 import android.text.InputFilter
 import android.text.InputType
 import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.Space
-import android.widget.TextView
-import android.widget.Toast
-import android.graphics.drawable.GradientDrawable
+import android.view.ViewGroup
+import android.widget.*
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -39,80 +32,33 @@ data class Cliente(
 
 class MainActivity : Activity() {
 
-    private val fundo = Color.BLACK
-    private val branco = Color.WHITE
-    private val cinza = Color.rgb(165, 165, 165)
-
-    private val vermelho = Color.rgb(235, 55, 70)
-    private val verde = Color.rgb(45, 210, 100)
-    private val azul = Color.rgb(55, 125, 255)
-
-    private val cinzaBorda = Color.rgb(90, 90, 90)
-    private val fundoCampo = Color.rgb(18, 18, 18)
-
     private val preferencias by lazy {
-        getSharedPreferences(
-            "rgb_play_gestao",
-            Context.MODE_PRIVATE
-        )
+        getSharedPreferences("rgb_play_gestao", Context.MODE_PRIVATE)
     }
+
+    // Cores Dark
+    private val fundo = Color.rgb(5, 5, 5)
+    private val fundoCard = Color.rgb(18, 18, 18)
+    private val fundoCampo = Color.rgb(15, 15, 15)
+    private val branco = Color.rgb(255, 255, 255)
+    private val cinza = Color.rgb(160, 160, 160)
+    private val cinzaBorda = Color.rgb(70, 70, 70)
+    private val verde = Color.rgb(0, 200, 83)
+    private val vermelho = Color.rgb(244, 67, 54)
+    private val azul = Color.rgb(41, 121, 255)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        window.statusBarColor = Color.BLACK
-        window.navigationBarColor = Color.BLACK
-
-        AgendamentoVencimentos.iniciar(this)
-
-        solicitarPermissaoNotificacao()
-
         mostrarInicio()
     }
 
-    private fun solicitarPermissaoNotificacao() {
-
-        if (
-            android.os.Build.VERSION.SDK_INT >=
-            android.os.Build.VERSION_CODES.TIRAMISU
-        ) {
-
-            if (
-                checkSelfPermission(
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-
-                requestPermissions(
-                    arrayOf(
-                        Manifest.permission.POST_NOTIFICATIONS
-                    ),
-                    200
-                )
-            }
-        }
-    }
-
-    // ============================================================
-    // DADOS
-    // ============================================================
-
     private fun carregarClientes(): MutableList<Cliente> {
-
         val lista = mutableListOf<Cliente>()
-
-        val texto = preferencias.getString(
-            "clientes",
-            "[]"
-        ) ?: "[]"
-
+        val texto = preferencias.getString("clientes", "[]") ?: "[]"
         try {
             val array = JSONArray(texto)
-
             for (i in 0 until array.length()) {
-
                 val objeto = array.getJSONObject(i)
-
                 lista.add(
                     Cliente(
                         nome = objeto.optString("nome"),
@@ -121,90 +67,46 @@ class MainActivity : Activity() {
                     )
                 )
             }
-
         } catch (_: Exception) {
         }
-
         return lista
     }
 
-    private fun salvarClientes(
-        clientes: List<Cliente>
-    ) {
-
+    private fun salvarClientes(clientes: List<Cliente>) {
         val array = JSONArray()
-
         clientes.forEach { cliente ->
-
-            val objeto = JSONObject()
-
-            objeto.put("nome", cliente.nome)
-            objeto.put("contato", cliente.contato)
-            objeto.put("dia", cliente.dia)
-
+            val objeto = JSONObject().apply {
+                put("nome", cliente.nome)
+                put("contato", cliente.contato)
+                put("dia", cliente.dia)
+            }
             array.put(objeto)
         }
-
-        preferencias
-            .edit()
-            .putString(
-                "clientes",
-                array.toString()
-            )
-            .apply()
+        preferencias.edit().putString("clientes", array.toString()).apply()
     }
 
     // ============================================================
     // DATAS
     // ============================================================
 
-    private fun proximoVencimento(
-        dia: Int
-    ): Calendar {
-
+    private fun proximoVencimento(dia: Int): Calendar {
         val hoje = Calendar.getInstance()
-
         var ano = hoje.get(Calendar.YEAR)
         var mes = hoje.get(Calendar.MONTH)
 
         while (true) {
+            val tentativa = Calendar.getInstance().apply {
+                set(ano, mes, 1, 0, 0, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val ultimoDia = tentativa.getActualMaximum(Calendar.DAY_OF_MONTH)
+            tentativa.set(ano, mes, minOf(dia, ultimoDia), 0, 0, 0)
 
-            val tentativa = Calendar.getInstance()
-
-            tentativa.set(
-                ano,
-                mes,
-                1,
-                0,
-                0,
-                0
-            )
-
-            tentativa.set(
-                Calendar.MILLISECOND,
-                0
-            )
-
-            val ultimoDia =
-                tentativa.getActualMaximum(
-                    Calendar.DAY_OF_MONTH
-                )
-
-            tentativa.set(
-                ano,
-                mes,
-                minOf(dia, ultimoDia),
-                0,
-                0,
-                0
-            )
-
-            if (!tentativa.before(hoje)) {
+            if (!tentativa.before(hoje.inicioDoDia())) {
                 return tentativa
             }
 
             mes++
-
             if (mes > Calendar.DECEMBER) {
                 mes = Calendar.JANUARY
                 ano++
@@ -212,69 +114,27 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun diasAte(
-        calendario: Calendar
-    ): Long {
-
-        val hoje = Calendar.getInstance()
-
-        hoje.set(
-            hoje.get(Calendar.YEAR),
-            hoje.get(Calendar.MONTH),
-            hoje.get(Calendar.DAY_OF_MONTH),
-            0,
-            0,
-            0
-        )
-
-        hoje.set(
-            Calendar.MILLISECOND,
-            0
-        )
-
-        val data =
-            calendario.clone() as Calendar
-
-        data.set(
-            data.get(Calendar.YEAR),
-            data.get(Calendar.MONTH),
-            data.get(Calendar.DAY_OF_MONTH),
-            0,
-            0,
-            0
-        )
-
-        data.set(
-            Calendar.MILLISECOND,
-            0
-        )
-
-        return (
-            data.timeInMillis -
-                hoje.timeInMillis
-            ) / (
-            1000L * 60L * 60L * 24L
-        )
+    private fun diasAte(calendario: Calendar): Long {
+        val hoje = Calendar.getInstance().inicioDoDia()
+        val data = (calendario.clone() as Calendar).inicioDoDia()
+        return (data.timeInMillis - hoje.timeInMillis) / (1000L * 60L * 60L * 24L)
     }
 
-    private fun formatarData(
-        calendario: Calendar
-    ): String {
-
-        return SimpleDateFormat(
-            "dd/MM/yyyy",
-            Locale("pt", "BR")
-        ).format(calendario.time)
+    private fun Calendar.inicioDoDia(): Calendar {
+        return (clone() as Calendar).apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
     }
 
-    private fun formatarDiaMes(
-        calendario: Calendar
-    ): String {
+    private fun formatarData(calendario: Calendar): String {
+        return SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR")).format(calendario.time)
+    }
 
-        return SimpleDateFormat(
-            "dd/MM",
-            Locale("pt", "BR")
-        ).format(calendario.time)
+    private fun formatarDiaMes(calendario: Calendar): String {
+        return SimpleDateFormat("dd/MM", Locale("pt", "BR")).format(calendario.time)
     }
 
     // ============================================================
@@ -282,148 +142,62 @@ class MainActivity : Activity() {
     // ============================================================
 
     private fun criarBase(): LinearLayout {
-
         return LinearLayout(this).apply {
-
-            orientation =
-                LinearLayout.VERTICAL
-
-            gravity =
-                Gravity.CENTER_HORIZONTAL
-
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
             setBackgroundColor(fundo)
-
-            setPadding(
-                24,
-                20,
-                24,
-                20
-            )
+            setPadding(24, 24, 24, 24)
         }
     }
 
-    /*
-     * Esta é a mudança principal do layout.
-     *
-     * O ScrollView ocupa toda a tela.
-     * O conteúdo interno usa fillViewport + CENTER_VERTICAL.
-     *
-     * Se o conteúdo couber:
-     *     fica centralizado verticalmente.
-     *
-     * Se não couber:
-     *     começa normalmente no topo e pode rolar.
-     */
-
-    private fun criarAreaCentral(
-        conteudo: LinearLayout
-    ): ScrollView {
-
-        val scroll =
-            ScrollView(this).apply {
-
-                isFillViewport = true
-
-                overScrollMode =
-                    View.OVER_SCROLL_IF_CONTENT_SCROLLS
-
-                setBackgroundColor(fundo)
-            }
-
-        conteudo.gravity =
-            Gravity.CENTER_HORIZONTAL or
-                Gravity.CENTER_VERTICAL
-
+    private fun criarAreaCentral(conteudo: LinearLayout): ScrollView {
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+            setBackgroundColor(fundo)
+        }
         scroll.addView(
             conteudo,
-            LinearLayout.LayoutParams(
-                -1,
-                -1
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
             )
         )
-
         return scroll
     }
 
-    private fun adicionarNaTela(
-        tela: LinearLayout,
-        scroll: ScrollView
-    ) {
-
+    private fun adicionarNaTela(tela: LinearLayout, scroll: ScrollView) {
         tela.addView(
             scroll,
             LinearLayout.LayoutParams(
-                -1,
+                LinearLayout.LayoutParams.MATCH_PARENT,
                 0,
                 1f
             )
         )
-
         setContentView(tela)
     }
 
-    // ============================================================
-    // TEXTOS
-    // ============================================================
-
-    private fun titulo(
-        texto: String,
-        tamanho: Float = 24f
-    ): TextView {
-
+    private fun titulo(texto: String, tamanho: Float = 24f): TextView {
         return TextView(this).apply {
-
             text = texto
-
             textSize = tamanho
-
             setTextColor(branco)
-
-            gravity =
-                Gravity.CENTER
-
-            typeface =
-                Typeface.DEFAULT_BOLD
-
-            maxLines = 2
-
-            setPadding(
-                8,
-                0,
-                8,
-                12
-            )
+            gravity = Gravity.CENTER
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(8, 0, 8, 16)
         }
     }
 
-    private fun texto(
-        texto: String,
-        tamanho: Float = 15f
-    ): TextView {
-
+    private fun texto(texto: String, tamanho: Float = 15f): TextView {
         return TextView(this).apply {
-
             text = texto
-
             textSize = tamanho
-
             setTextColor(branco)
-
-            gravity =
-                Gravity.CENTER
-
-            setPadding(
-                8,
-                8,
-                8,
-                8
-            )
+            gravity = Gravity.CENTER
+            setPadding(8, 8, 8, 8)
         }
     }
-
-    // ============================================================
-    // BOTÕES
-    // ============================================================
 
     private fun botao(
         texto: String,
@@ -432,78 +206,40 @@ class MainActivity : Activity() {
         tamanhoFonte: Float = 16f,
         acao: () -> Unit
     ): TextView {
-
         return TextView(this).apply {
-
             this.text = texto
-
             textSize = tamanhoFonte
-
             setTextColor(branco)
-
-            gravity =
-                Gravity.CENTER
-
-            typeface =
-                Typeface.DEFAULT_BOLD
-
+            gravity = Gravity.CENTER
+            typeface = Typeface.DEFAULT_BOLD
             maxLines = 2
-
-            setPadding(
-                18,
-                8,
-                18,
-                8
-            )
-
-            background =
-                GradientDrawable().apply {
-
-                    setColor(
-                        Color.rgb(
-                            8,
-                            8,
-                            8
-                        )
-                    )
-
-                    setStroke(
-                        3,
-                        corBorda
-                    )
-
-                    cornerRadius = 20f
-                }
-
-            isClickable = true
-
-            setOnClickListener {
-                acao()
+            setPadding(18, 8, 18, 8)
+            background = GradientDrawable().apply {
+                setColor(Color.rgb(10, 10, 10))
+                setStroke(3, corBorda)
+                cornerRadius = 18f
             }
-
-            layoutParams =
-                LinearLayout.LayoutParams(
-                    -1,
-                    altura
-                ).apply {
-                    topMargin = 7
-                    bottomMargin = 7
-                }
+            isClickable = true
+            setOnClickListener { acao() }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(altura)
+            ).apply {
+                topMargin = dp(6)
+                bottomMargin = dp(6)
+            }
         }
     }
 
-    private fun espaco(
-        altura: Int
-    ): Space {
-
+    private fun espaco(altura: Int): Space {
         return Space(this).apply {
-
-            layoutParams =
-                LinearLayout.LayoutParams(
-                    1,
-                    altura
-                )
+            layoutParams = LinearLayout.LayoutParams(1, dp(altura))
         }
+    }
+
+    private fun dp(valor: Int): Int {
+        val densidade = resources.displayMetrics.density
+        return (valor * densidade).toInt()
     }
 
     // ============================================================
@@ -511,72 +247,36 @@ class MainActivity : Activity() {
     // ============================================================
 
     private fun criarLogo(): LinearLayout {
+        val caixa = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(10, dp(10), 10, dp(20))
+        }
 
-        val caixa =
-            LinearLayout(this).apply {
-
-                orientation =
-                    LinearLayout.VERTICAL
-
-                gravity =
-                    Gravity.CENTER
-
-                setPadding(
-                    10,
-                    0,
-                    10,
-                    22
-                )
-            }
-
-        val logo =
-            android.widget.ImageView(this).apply {
-
-                setImageResource(
-                    R.drawable.logo_rgb
-                )
-
-                scaleType =
-                    android.widget.ImageView.ScaleType.CENTER_INSIDE
-
-                adjustViewBounds = true
-            }
+        val logo = ImageView(this).apply {
+            setImageResource(R.drawable.logo_rgb)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            adjustViewBounds = true
+        }
 
         caixa.addView(
             logo,
             LinearLayout.LayoutParams(
-                -1,
-                150
+                dp(220),
+                dp(180)
             )
         )
 
-        val subtitulo =
-            TextView(this).apply {
+        val subtitulo = TextView(this).apply {
+            text = "GESTÃO DE CLIENTES"
+            textSize = 13f
+            setTextColor(cinza)
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(0, dp(6), 0, 0)
+        }
 
-                text =
-                    "GESTÃO DE CLIENTES"
-
-                textSize = 12f
-
-                setTextColor(
-                    cinza
-                )
-
-                gravity =
-                    Gravity.CENTER
-
-                setPadding(
-                    0,
-                    5,
-                    0,
-                    0
-                )
-            }
-
-        caixa.addView(
-            subtitulo
-        )
-
+        caixa.addView(subtitulo)
         return caixa
     }
 
@@ -585,1156 +285,571 @@ class MainActivity : Activity() {
     // ============================================================
 
     private fun mostrarInicio() {
+        val tela = criarBase()
+        val conteudo = criarBase().apply {
+            gravity = Gravity.CENTER
+            setPadding(20, 20, 20, 20)
+        }
 
-        val tela =
-            criarBase()
-
-        val conteudo =
-            criarBase()
-
-        conteudo.gravity =
-            Gravity.CENTER
-
-        conteudo.setPadding(
-            20,
-            30,
-            20,
-            30
-        )
+        conteudo.addView(criarLogo())
+        conteudo.addView(espaco(10))
 
         conteudo.addView(
-            criarLogo(),
-            LinearLayout.LayoutParams(
-                -1,
-                -2
-            )
-        )
-
-        conteudo.addView(
-            botao(
-                "ADICIONAR CLIENTE",
-                vermelho,
-                82,
-                17f
-            ) {
+            botao("ADICIONAR CLIENTE", vermelho, 72, 17f) {
                 mostrarAdicionarCliente()
             }
         )
 
         conteudo.addView(
-            botao(
-                "VER CLIENTES",
-                verde,
-                82,
-                17f
-            ) {
+            botao("VER CLIENTES", verde, 72, 17f) {
                 mostrarClientes()
             }
         )
 
         conteudo.addView(
-            botao(
-                "PRÓXIMOS VENCIMENTOS",
-                azul,
-                82,
-                17f
-            ) {
+            botao("PRÓXIMOS VENCIMENTOS", azul, 72, 17f) {
                 mostrarProximosVencimentos()
             }
         )
 
-        val scroll =
-            criarAreaCentral(
-                conteudo
-            )
-
-        adicionarNaTela(
-            tela,
-            scroll
-        )
+        val scroll = criarAreaCentral(conteudo)
+        adicionarNaTela(tela, scroll)
     }
 
     // ============================================================
-    // CAMPOS
+    // FORMULÁRIO ADICIONAR / EDITAR
     // ============================================================
 
-    private fun campo(
-        dica: String,
-        tipo: Int =
-            InputType.TYPE_CLASS_TEXT
-    ): EditText {
-
+    private fun campo(dica: String, tipo: Int = InputType.TYPE_CLASS_TEXT): EditText {
         return EditText(this).apply {
-
             hint = dica
-
-            setHintTextColor(
-                ColorStateList.valueOf(
-                    Color.rgb(
-                        130,
-                        130,
-                        130
-                    )
-                )
-            )
-
+            setHintTextColor(ColorStateList.valueOf(Color.rgb(130, 130, 130)))
             setTextColor(branco)
-
             textSize = 15f
-
             inputType = tipo
-
             setSingleLine(true)
-
-            setPadding(
-                18,
-                0,
-                18,
-                0
-            )
-
-            background =
-                GradientDrawable().apply {
-
-                    setColor(
-                        fundoCampo
-                    )
-
-                    setStroke(
-                        1,
-                        cinzaBorda
-                    )
-
-                    cornerRadius = 15f
-                }
+            setPadding(dp(16), 0, dp(16), 0)
+            background = GradientDrawable().apply {
+                setColor(fundoCampo)
+                setStroke(1, cinzaBorda)
+                cornerRadius = 14f
+            }
         }
     }
 
-    // ============================================================
-    // MÁSCARA TELEFONE
-    // ============================================================
-
-    private fun aplicarMascaraTelefone(
-        campo: EditText
-    ) {
-
+    private fun aplicarMascaraTelefone(campo: EditText) {
         var alterando = false
-
-        campo.addTextChangedListener(
-            object : TextWatcher {
-
-                override fun beforeTextChanged(
-                    s: CharSequence?,
-                    start: Int,
-                    count: Int,
-                    after: Int
-                ) {
-                }
-
-                override fun onTextChanged(
-                    s: CharSequence?,
-                    start: Int,
-                    before: Int,
-                    count: Int
-                ) {
-                }
-
-                override fun afterTextChanged(
-                    s: Editable?
-                ) {
-
-                    if (alterando) {
-                        return
-                    }
-
-                    val numeros =
-                        s?.toString()
-                            ?.filter {
-                                it.isDigit()
-                            }
-                            ?: ""
-
-                    val limitado =
-                        numeros.take(11)
-
-                    val formatado =
-                        formatarTelefone(
-                            limitado
-                        )
-
-                    if (
-                        s?.toString() !=
-                        formatado
-                    ) {
-
-                        alterando = true
-
-                        campo.setText(
-                            formatado
-                        )
-
-                        campo.setSelection(
-                            formatado.length
-                        )
-
-                        alterando = false
-                    }
+        campo.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                if (alterando) return
+                val numeros = s?.toString()?.filter { it.isDigit() } ?: ""
+                val limitado = numeros.take(11)
+                val formatado = formatarTelefone(limitado)
+                if (s?.toString() != formatado) {
+                    alterando = true
+                    campo.setText(formatado)
+                    campo.setSelection(formatado.length)
+                    alterando = false
                 }
             }
-        )
+        })
     }
 
-    private fun formatarTelefone(
-        numeros: String
-    ): String {
-
-        if (numeros.isEmpty()) {
-            return ""
-        }
-
-        if (numeros.length <= 2) {
-            return "($numeros"
-        }
-
-        if (numeros.length <= 7) {
-
-            return "(" +
-                numeros.substring(
-                    0,
-                    2
-                ) +
-                ") " +
-                numeros.substring(2)
-        }
-
+    private fun formatarTelefone(numeros: String): String {
+        if (numeros.isEmpty()) return ""
+        if (numeros.length <= 2) return "($numeros"
+        if (numeros.length <= 7) return "(" + numeros.substring(0, 2) + ") " + numeros.substring(2)
         if (numeros.length <= 11) {
-
-            val ddd =
-                numeros.substring(
-                    0,
-                    2
-                )
-
-            val restante =
-                numeros.substring(2)
-
-            return if (
-                restante.length <= 5
-            ) {
-
+            val ddd = numeros.substring(0, 2)
+            val restante = numeros.substring(2)
+            return if (restante.length <= 5) {
                 "($ddd) $restante"
-
             } else {
-
-                "(" +
-                    ddd +
-                    ") " +
-                    restante.substring(
-                        0,
-                        5
-                    ) +
-                    "-" +
-                    restante.substring(5)
+                "(" + ddd + ") " + restante.substring(0, 5) + "-" + restante.substring(5)
             }
         }
-
         return numeros
     }
 
-    // ============================================================
-    // ADICIONAR / EDITAR
-    // ============================================================
-
-    private fun mostrarAdicionarCliente(
-        clienteExistente: Cliente? = null
-    ) {
-
-        val editando =
-            clienteExistente != null
-
-        val tela =
-            criarBase()
-
-        val conteudo =
-            criarBase()
-
-        conteudo.gravity =
-            Gravity.CENTER_HORIZONTAL or
-                Gravity.CENTER_VERTICAL
-
-        conteudo.setPadding(
-            0,
-            20,
-            0,
-            20
-        )
-
-        conteudo.addView(
-            titulo(
-                if (editando)
-                    "EDITAR CLIENTE"
-                else
-                    "ADICIONAR CLIENTE",
-                24f
-            )
-        )
-
-        val nome =
-            campo(
-                "Nome do cliente"
-            )
-
-        val contato =
-            campo(
-                "WhatsApp / telefone",
-                InputType.TYPE_CLASS_PHONE
-            )
-
-        aplicarMascaraTelefone(
-            contato
-        )
-
-        val dia =
-            campo(
-                "Dia da contratação (1 a 31)",
-                InputType.TYPE_CLASS_NUMBER
-            )
-
-        dia.filters =
-            arrayOf(
-                InputFilter.LengthFilter(2)
-            )
-
-        if (clienteExistente != null) {
-
-            nome.setText(
-                clienteExistente.nome
-            )
-
-            contato.setText(
-                clienteExistente.contato
-            )
-
-            dia.setText(
-                clienteExistente.dia.toString()
-            )
+    private fun mostrarAdicionarCliente(clienteExistente: Cliente? = null) {
+        val editando = clienteExistente != null
+        val tela = criarBase()
+        val conteudo = criarBase().apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(0, dp(15), 0, dp(15))
         }
 
-        val larguraCampo =
-            LinearLayout.LayoutParams(
-                -1,
-                150
-            ).apply {
-                topMargin = 6
-                bottomMargin = 6
-            }
+        conteudo.addView(titulo(if (editando) "EDITAR CLIENTE" else "ADICIONAR CLIENTE", 24f))
 
-        conteudo.addView(
-            nome,
-            larguraCampo
-        )
+        val nome = campo("Nome do cliente")
+        val contato = campo("WhatsApp / telefone", InputType.TYPE_CLASS_PHONE)
+        aplicarMascaraTelefone(contato)
 
-        conteudo.addView(
-            contato,
-            LinearLayout.LayoutParams(
-                -1,
-                150
-            ).apply {
-                topMargin = 6
-                bottomMargin = 6
-            }
-        )
+        val dia = campo("Dia da contratação (1 a 31)", InputType.TYPE_CLASS_NUMBER).apply {
+            filters = arrayOf(InputFilter.LengthFilter(2))
+        }
 
-        conteudo.addView(
-            dia,
-            LinearLayout.LayoutParams(
-                -1,
-                150
-            ).apply {
-                topMargin = 6
-                bottomMargin = 6
-            }
-        )
+        if (clienteExistente != null) {
+            nome.setText(clienteExistente.nome)
+            contato.setText(clienteExistente.contato)
+            dia.setText(clienteExistente.dia.toString())
+        }
+
+        val paramsCampo = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(56)
+        ).apply {
+            topMargin = dp(6)
+            bottomMargin = dp(6)
+        }
+
+        conteudo.addView(nome, paramsCampo)
+        conteudo.addView(contato, paramsCampo)
+        conteudo.addView(dia, paramsCampo)
+
+        conteudo.addView(espaco(10))
 
         conteudo.addView(
             botao(
-                if (editando)
-                    "SALVAR ALTERAÇÕES"
-                else
-                    "CADASTRAR CLIENTE",
-                if (editando)
-                    azul
-                else
-                    verde,
-                72,
+                if (editando) "SALVAR ALTERAÇÕES" else "CADASTRAR CLIENTE",
+                if (editando) azul else verde,
+                68,
                 16f
             ) {
-
-                val nomeTexto =
-                    nome.text
-                        .toString()
-                        .trim()
-
-                val contatoTexto =
-                    contato.text
-                        .toString()
-                        .trim()
-
-                val diaTexto =
-                    dia.text
-                        .toString()
-                        .trim()
+                val nomeTexto = nome.text.toString().trim()
+                val contatoTexto = contato.text.toString().trim()
+                val diaTexto = dia.text.toString().trim()
 
                 if (nomeTexto.isEmpty()) {
-
-                    Toast.makeText(
-                        this,
-                        "Informe o nome do cliente.",
-                        Toast.LENGTH_SHORT
-                    ).show()
-
+                    Toast.makeText(this, "Informe o nome do cliente.", Toast.LENGTH_SHORT).show()
                     return@botao
                 }
 
-                val diaNumero =
-                    diaTexto.toIntOrNull()
-
-                if (
-                    diaNumero == null ||
-                    diaNumero !in 1..31
-                ) {
-
-                    Toast.makeText(
-                        this,
-                        "Informe um dia entre 1 e 31.",
-                        Toast.LENGTH_SHORT
-                    ).show()
-
+                val diaNumero = diaTexto.toIntOrNull()
+                if (diaNumero == null || diaNumero !in 1..31) {
+                    Toast.makeText(this, "Informe um dia entre 1 e 31.", Toast.LENGTH_SHORT).show()
                     return@botao
                 }
 
-                val clientes =
-                    carregarClientes()
+                val clientes = carregarClientes()
 
                 if (!editando) {
-
-                    val duplicado =
-                        clientes.any {
-
-                            it.nome.equals(
-                                nomeTexto,
-                                ignoreCase = true
-                            )
-                        }
-
-                    if (duplicado) {
-
-                        Toast.makeText(
-                            this,
-                            "Esse cliente já está cadastrado.",
-                            Toast.LENGTH_SHORT
-                        ).show()
-
+                    if (clientes.any { it.nome.equals(nomeTexto, ignoreCase = true) }) {
+                        Toast.makeText(this, "Esse cliente já está cadastrado.", Toast.LENGTH_SHORT).show()
                         return@botao
                     }
-
-                    clientes.add(
-                        Cliente(
-                            nomeTexto,
-                            contatoTexto,
-                            diaNumero
-                        )
-                    )
-
+                    clientes.add(Cliente(nomeTexto, contatoTexto, diaNumero))
                 } else {
-
-                    val antigo =
-                        clienteExistente!!
-
-                    val cliente =
-                        clientes.find {
-                            it.nome ==
-                                antigo.nome
-                        }
-
+                    val cliente = clientes.find { it.nome == clienteExistente!!.nome }
                     if (cliente != null) {
-
-                        cliente.nome =
-                            nomeTexto
-
-                        cliente.contato =
-                            contatoTexto
-
-                        cliente.dia =
-                            diaNumero
+                        cliente.nome = nomeTexto
+                        cliente.contato = contatoTexto
+                        cliente.dia = diaNumero
                     }
                 }
 
-                salvarClientes(
-                    clientes
-                )
-
-                Toast.makeText(
-                    this,
-                    if (editando)
-                        "Cliente atualizado."
-                    else
-                        "Cliente cadastrado.",
-                    Toast.LENGTH_SHORT
-                ).show()
-
+                salvarClientes(clientes)
+                Toast.makeText(this, if (editando) "Cliente atualizado." else "Cliente cadastrado.", Toast.LENGTH_SHORT).show()
                 mostrarInicio()
             }
         )
 
         conteudo.addView(
-            botao(
-                "VOLTAR",
-                cinzaBorda,
-                62,
-                15f
-            ) {
+            botao("VOLTAR", cinzaBorda, 60, 15f) {
                 mostrarInicio()
             }
         )
 
-        adicionarNaTela(
-            tela,
-            criarAreaCentral(
-                conteudo
-            )
-        )
+        adicionarNaTela(tela, criarAreaCentral(conteudo))
     }
 
     // ============================================================
-    // CLIENTES
+    // CLIENTES (GRID 2 COLUNAS)
     // ============================================================
 
     private fun mostrarClientes() {
-
-        val tela =
-            criarBase()
-
-        val conteudo =
-            criarBase()
-
-        conteudo.gravity =
-            Gravity.CENTER_HORIZONTAL or
-                Gravity.CENTER_VERTICAL
-
-        conteudo.addView(
-            titulo(
-                "CLIENTES",
-                24f
-            )
-        )
-
-        val clientes =
-            carregarClientes()
-
-        clientes.sortBy {
-
-            proximoVencimento(
-                it.dia
-            ).timeInMillis
+        val tela = criarBase()
+        val conteudo = criarBase().apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(0, dp(10), 0, dp(10))
         }
+
+        conteudo.addView(titulo("CLIENTES", 24f))
+
+        val clientes = carregarClientes()
+        clientes.sortBy { proximoVencimento(it.dia).timeInMillis }
 
         if (clientes.isEmpty()) {
-
-            conteudo.addView(
-                texto(
-                    "Nenhum cliente cadastrado.",
-                    15f
-                )
-            )
-
+            conteudo.addView(texto("Nenhum cliente cadastrado.", 15f))
         } else {
-
-            clientes.forEach { cliente ->
-
-                conteudo.addView(
-                    criarBlocoCliente(
-                        cliente
-                    )
-                )
-
-                conteudo.addView(
-                    espaco(10)
+            val grid = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
                 )
             }
+
+            var linhaAtual: LinearLayout? = null
+
+            clientes.forEachIndexed { index, cliente ->
+                if (index % 2 == 0) {
+                    linhaAtual = LinearLayout(this).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply {
+                            bottomMargin = dp(10)
+                        }
+                    }
+                    grid.addView(linhaAtual)
+                }
+
+                val dias = diasAte(proximoVencimento(cliente.dia))
+                val estaCritico = dias in 0L..3L
+                val card = criarCardQuadrado(cliente, estaCritico) {
+                    mostrarDetalhesCliente(cliente)
+                }
+
+                val paramsCard = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    if (index % 2 == 0) {
+                        rightMargin = dp(5)
+                    } else {
+                        leftMargin = dp(5)
+                    }
+                }
+                linhaAtual?.addView(card, paramsCard)
+            }
+
+            // Se for número ímpar, adiciona um espaço invisível na direita para manter o grid alinhado
+            if (clientes.size % 2 != 0) {
+                val espacoVazio = Space(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, 1, 1f).apply {
+                        leftMargin = dp(5)
+                    }
+                }
+                linhaAtual?.addView(espacoVazio)
+            }
+
+            conteudo.addView(grid)
         }
 
+        conteudo.addView(espaco(10))
         conteudo.addView(
-            botao(
-                "VOLTAR",
-                cinzaBorda,
-                62,
-                15f
-            ) {
+            botao("VOLTAR", cinzaBorda, 60, 15f) {
                 mostrarInicio()
             }
         )
 
-        adicionarNaTela(
-            tela,
-            criarAreaCentral(
-                conteudo
-            )
-        )
+        adicionarNaTela(tela, criarAreaCentral(conteudo))
     }
 
-    private fun criarBlocoCliente(
-        cliente: Cliente
-    ): TextView {
+    private fun criarCardQuadrado(
+        cliente: Cliente,
+        critico: Boolean,
+        acao: () -> Unit
+    ): LinearLayout {
+        val corDestaque = if (critico) vermelho else verde
+        val vencimento = proximoVencimento(cliente.dia)
 
-        val vencimento =
-            proximoVencimento(
-                cliente.dia
-            )
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(12), dp(16), dp(12), dp(16))
+            background = GradientDrawable().apply {
+                setColor(fundoCard)
+                setStroke(dp(2), corDestaque)
+                cornerRadius = 16f
+            }
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { acao() }
+        }
 
-        val data =
-            formatarDiaMes(
-                vencimento
-            )
-
-        return TextView(this).apply {
-
-            text =
-                "${cliente.nome}   •   Vence todo dia ${cliente.dia}"
-
-            textSize = 14f
-
+        val txtNome = TextView(this).apply {
+            text = cliente.nome
+            textSize = 15f
             setTextColor(branco)
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+        card.addView(txtNome)
 
-            gravity =
-                Gravity.CENTER_VERTICAL
+        val txtDia = TextView(this).apply {
+            text = "Dia ${cliente.dia}"
+            textSize = 12f
+            setTextColor(cinza)
+            gravity = Gravity.CENTER
+            setPadding(0, dp(4), 0, dp(2))
+        }
+        card.addView(txtDia)
 
-            maxLines = 1
+        val txtVenc = TextView(this).apply {
+            text = formatarDiaMes(vencimento)
+            textSize = 13f
+            setTextColor(corDestaque)
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+        }
+        card.addView(txtVenc)
 
-            ellipsize =
-                android.text.TextUtils.TruncateAt.END
+        return card
+    }
 
-            setPadding(
-                18,
-                0,
-                18,
-                0
+    // ============================================================
+    // PRÓXIMOS VENCIMENTOS (GRID 2 COLUNAS)
+    // ============================================================
+
+    private fun mostrarProximosVencimentos() {
+        val tela = criarBase()
+        val conteudo = criarBase().apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(0, dp(10), 0, dp(10))
+        }
+
+        conteudo.addView(titulo("PRÓXIMOS VENCIMENTOS", 22f))
+
+        val clientes = carregarClientes().filter {
+            val vencimento = proximoVencimento(it.dia)
+            val dias = diasAte(vencimento)
+            dias in 0L..3L
+        }.sortedBy {
+            proximoVencimento(it.dia).timeInMillis
+        }
+
+        if (clientes.isEmpty()) {
+            conteudo.addView(
+                texto("Nenhum cliente vence\nnos próximos 3 dias.", 16f)
             )
-
-            background =
-                GradientDrawable().apply {
-
-                    setColor(
-                        Color.rgb(
-                            15,
-                            15,
-                            15
-                        )
-                    )
-
-                    setStroke(
-                        2,
-                        verde
-                    )
-
-                    cornerRadius = 14f
-                }
-
-            setOnClickListener {
-
-                mostrarDetalhesCliente(
-                    cliente
+        } else {
+            val grid = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
                 )
             }
 
-            layoutParams =
-                LinearLayout.LayoutParams(
-                    -1,
-                    66
-                )
-        }
-    }
+            var linhaAtual: LinearLayout? = null
 
-    // ============================================================
-    // DETALHES
-    // ============================================================
+            clientes.forEachIndexed { index, cliente ->
+                if (index % 2 == 0) {
+                    linhaAtual = LinearLayout(this).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply {
+                            bottomMargin = dp(10)
+                        }
+                    }
+                    grid.addView(linhaAtual)
+                }
 
-    private fun mostrarDetalhesCliente(
-        cliente: Cliente
-    ) {
+                val vencimento = proximoVencimento(cliente.dia)
+                val dias = diasAte(vencimento)
+                val status = when (dias) {
+                    0L -> "HOJE"
+                    1L -> "AMANHÃ"
+                    else -> "EM $dias DIAS"
+                }
 
-        val tela =
-            criarBase()
-
-        val conteudo =
-            criarBase()
-
-        conteudo.gravity =
-            Gravity.CENTER_HORIZONTAL or
-                Gravity.CENTER_VERTICAL
-
-        conteudo.addView(
-            titulo(
-                cliente.nome,
-                23f
-            )
-        )
-
-        val vencimento =
-            proximoVencimento(
-                cliente.dia
-            )
-
-        val dias =
-            diasAte(
-                vencimento
-            )
-
-        val contatoExibicao =
-            if (
-                cliente.contato.isEmpty()
-            )
-                "Não informado"
-            else
-                cliente.contato
-
-        val contato =
-            TextView(this).apply {
-
-                text =
-                    "WhatsApp\n$contatoExibicao"
-
-                textSize = 15f
-
-                setTextColor(
-                    if (
-                        cliente.contato.isEmpty()
-                    )
-                        cinza
-                    else
-                        verde
-                )
-
-                gravity =
-                    Gravity.CENTER
-
-                setPadding(
-                    12,
-                    12,
-                    12,
-                    12
-                )
-
-                if (
-                    cliente.contato.isNotEmpty()
-                ) {
-
+                val card = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER
+                    setPadding(dp(12), dp(16), dp(12), dp(16))
+                    background = GradientDrawable().apply {
+                        setColor(fundoCard)
+                        setStroke(dp(2), vermelho)
+                        cornerRadius = 16f
+                    }
                     isClickable = true
+                    isFocusable = true
+                    setOnClickListener { mostrarDetalhesCliente(cliente) }
+                }
 
-                    setOnClickListener {
+                val txtNome = TextView(this).apply {
+                    text = cliente.nome
+                    textSize = 15f
+                    setTextColor(branco)
+                    typeface = Typeface.DEFAULT_BOLD
+                    gravity = Gravity.CENTER
+                    maxLines = 2
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                }
+                card.addView(txtNome)
 
-                        abrirWhatsApp(
-                            cliente.contato
-                        )
+                val txtData = TextView(this).apply {
+                    text = formatarData(vencimento)
+                    textSize = 12f
+                    setTextColor(cinza)
+                    gravity = Gravity.CENTER
+                    setPadding(0, dp(4), 0, dp(2))
+                }
+                card.addView(txtData)
+
+                val txtStatus = TextView(this).apply {
+                    text = status
+                    textSize = 13f
+                    setTextColor(vermelho)
+                    typeface = Typeface.DEFAULT_BOLD
+                    gravity = Gravity.CENTER
+                }
+                card.addView(txtStatus)
+
+                val paramsCard = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    if (index % 2 == 0) {
+                        rightMargin = dp(5)
+                    } else {
+                        leftMargin = dp(5)
                     }
                 }
+                linhaAtual?.addView(card, paramsCard)
             }
 
-        conteudo.addView(
-            contato,
-            LinearLayout.LayoutParams(
-                -1,
-                150
-            )
-        )
-
-        conteudo.addView(
-            texto(
-                "Dia da contratação\n" +
-                    "Todo dia ${cliente.dia}",
-                15f
-            )
-        )
-
-        conteudo.addView(
-            texto(
-                "Próximo vencimento\n" +
-                    formatarData(
-                        vencimento
-                    ) +
-                    "\n" +
-                    when (dias) {
-
-                        0L ->
-                            "VENCE HOJE"
-
-                        1L ->
-                            "VENCE AMANHÃ"
-
-                        else ->
-                            "Faltam $dias dias"
-                    },
-                15f
-            )
-        )
-
-        conteudo.addView(
-            espaco(12)
-        )
-
-        if (
-            cliente.contato.isNotEmpty()
-        ) {
-
-            conteudo.addView(
-                botao(
-                    "ABRIR WHATSAPP",
-                    verde,
-                    68,
-                    16f
-                ) {
-
-                    abrirWhatsApp(
-                        cliente.contato
-                    )
+            if (clientes.size % 2 != 0) {
+                val espacoVazio = Space(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, 1, 1f).apply {
+                        leftMargin = dp(5)
+                    }
                 }
-            )
+                linhaAtual?.addView(espacoVazio)
+            }
 
+            conteudo.addView(grid)
+        }
+
+        conteudo.addView(espaco(12))
+        conteudo.addView(
+            botao("VOLTAR", cinzaBorda, 60, 15f) {
+                mostrarInicio()
+            }
+        )
+
+        adicionarNaTela(tela, criarAreaCentral(conteudo))
+    }
+
+    // ============================================================
+    // DETALHES DO CLIENTE
+    // ============================================================
+
+    private fun mostrarDetalhesCliente(cliente: Cliente) {
+        val tela = criarBase()
+        val conteudo = criarBase().apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(0, dp(15), 0, dp(15))
+        }
+
+        conteudo.addView(titulo(cliente.nome, 23f))
+
+        val vencimento = proximoVencimento(cliente.dia)
+        val dias = diasAte(vencimento)
+        val contatoExibicao = if (cliente.contato.isEmpty()) "Não informado" else cliente.contato
+
+        val contato = TextView(this).apply {
+            text = "WhatsApp\n$contatoExibicao"
+            textSize = 15f
+            setTextColor(if (cliente.contato.isEmpty()) cinza else verde)
+            gravity = Gravity.CENTER
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            if (cliente.contato.isNotEmpty()) {
+                isClickable = true
+                setOnClickListener { abrirWhatsApp(cliente.contato) }
+            }
+        }
+        conteudo.addView(contato)
+
+        conteudo.addView(
+            texto("Dia da contratação\nTodo dia ${cliente.dia}", 15f)
+        )
+
+        val textoStatus = when (dias) {
+            0L -> "VENCE HOJE"
+            1L -> "VENCE AMANHÃ"
+            else -> "Faltam $dias dias"
+        }
+
+        conteudo.addView(
+            texto("Próximo vencimento\n${formatarData(vencimento)}\n$textoStatus", 15f)
+        )
+
+        conteudo.addView(espaco(10))
+
+        if (cliente.contato.isNotEmpty()) {
             conteudo.addView(
-                espaco(4)
+                botao("ABRIR WHATSAPP", verde, 64, 16f) {
+                    abrirWhatsApp(cliente.contato)
+                }
             )
         }
 
         conteudo.addView(
-            botao(
-                "EDITAR CLIENTE",
-                azul,
-                68,
-                16f
-            ) {
-
-                mostrarAdicionarCliente(
-                    cliente
-                )
+            botao("EDITAR CLIENTE", azul, 64, 16f) {
+                mostrarAdicionarCliente(cliente)
             }
         )
 
         conteudo.addView(
-            botao(
-                "EXCLUIR CLIENTE",
-                vermelho,
-                68,
-                16f
-            ) {
-
-                confirmarExclusao(
-                    cliente
-                )
+            botao("EXCLUIR CLIENTE", vermelho, 64, 16f) {
+                confirmarExclusao(cliente)
             }
         )
 
         conteudo.addView(
-            botao(
-                "VOLTAR",
-                cinzaBorda,
-                62,
-                15f
-            ) {
-
+            botao("VOLTAR", cinzaBorda, 60, 15f) {
                 mostrarClientes()
             }
         )
 
-        adicionarNaTela(
-            tela,
-            criarAreaCentral(
-                conteudo
-            )
-        )
+        adicionarNaTela(tela, criarAreaCentral(conteudo))
     }
 
-    // ============================================================
-    // WHATSAPP
-    // ============================================================
-
-    private fun abrirWhatsApp(
-        contato: String
-    ) {
-
-        var numero = contato.filter {
-            it.isDigit()
-        }
-
+    private fun abrirWhatsApp(contato: String) {
+        var numero = contato.filter { it.isDigit() }
         if (numero.length == 10 || numero.length == 11) {
             numero = "55$numero"
         }
 
         if (numero.length < 12) {
-            Toast.makeText(
-                this,
-                "Número de WhatsApp inválido.",
-                Toast.LENGTH_SHORT
-            ).show()
+            Toast.makeText(this, "Número de WhatsApp inválido.", Toast.LENGTH_SHORT).show()
             return
         }
 
         try {
-
-            val whatsappIntent = Intent(
-                Intent.ACTION_VIEW,
-                Uri.parse("https://wa.me/$numero")
-            )
-
-            whatsappIntent.setPackage("com.whatsapp")
-
-            try {
-
-                startActivity(whatsappIntent)
-
-            } catch (_: Exception) {
-
-                val browserIntent = Intent(
-                    Intent.ACTION_VIEW,
-                    Uri.parse("https://wa.me/$numero")
-                )
-
-                startActivity(browserIntent)
+            val whatsappIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$numero")).apply {
+                setPackage("com.whatsapp")
             }
-
+            try {
+                startActivity(whatsappIntent)
+            } catch (_: Exception) {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$numero")))
+            }
         } catch (_: Exception) {
-
-            Toast.makeText(
-                this,
-                "Não foi possível abrir o WhatsApp.",
-                Toast.LENGTH_SHORT
-            ).show()
+            Toast.makeText(this, "Não foi possível abrir o WhatsApp.", Toast.LENGTH_SHORT).show()
         }
     }
 
-    // ============================================================
-    // EXCLUSÃO
-    // ============================================================
-
-    private fun confirmarExclusao(
-        cliente: Cliente
-    ) {
-
+    private fun confirmarExclusao(cliente: Cliente) {
         AlertDialog.Builder(this)
-
-            .setTitle(
-                "Excluir cliente"
-            )
-
-            .setMessage(
-                "Deseja realmente excluir ${cliente.nome}?"
-            )
-
-            .setNegativeButton(
-                "CANCELAR",
-                null
-            )
-
-            .setPositiveButton(
-                "EXCLUIR"
-            ) { _, _ ->
-
-                val clientes =
-                    carregarClientes()
-
-                clientes.removeAll {
-
-                    it.nome ==
-                        cliente.nome
-                }
-
-                salvarClientes(
-                    clientes
-                )
-
+            .setTitle("Excluir cliente")
+            .setMessage("Deseja realmente excluir ${cliente.nome}?")
+            .setNegativeButton("CANCELAR", null)
+            .setPositiveButton("EXCLUIR") { _, _ ->
+                val clientes = carregarClientes()
+                clientes.removeAll { it.nome == cliente.nome }
+                salvarClientes(clientes)
                 mostrarClientes()
             }
-
             .show()
     }
 
-    // ============================================================
-    // PRÓXIMOS VENCIMENTOS
-    // ============================================================
-
-    private fun mostrarProximosVencimentos() {
-
-        val tela =
-            criarBase()
-
-        val conteudo =
-            criarBase()
-
-        conteudo.gravity =
-            Gravity.CENTER_HORIZONTAL or
-                Gravity.CENTER_VERTICAL
-
-        conteudo.addView(
-            titulo(
-                "PRÓXIMOS VENCIMENTOS",
-                22f
-            )
-        )
-
-        val clientes =
-            carregarClientes()
-                .filter {
-
-                    val vencimento =
-                        proximoVencimento(
-                            it.dia
-                        )
-
-                    val dias =
-                        diasAte(
-                            vencimento
-                        )
-
-                    dias in 0L..3L
-                }
-                .sortedBy {
-
-                    proximoVencimento(
-                        it.dia
-                    ).timeInMillis
-                }
-
-        if (clientes.isEmpty()) {
-
-            conteudo.addView(
-                texto(
-                    "Nenhum cliente vence\n" +
-                        "nos próximos 3 dias.",
-                    16f
-                )
-            )
-
-        } else {
-
-            clientes.forEach { cliente ->
-
-                val vencimento =
-                    proximoVencimento(
-                        cliente.dia
-                    )
-
-                val dias =
-                    diasAte(
-                        vencimento
-                    )
-
-                val status =
-                    when (dias) {
-
-                        0L ->
-                            "HOJE"
-
-                        1L ->
-                            "AMANHÃ"
-
-                        else ->
-                            "EM $dias DIAS"
-                    }
-
-                val bloco =
-                    TextView(this).apply {
-
-                        text =
-                            "${cliente.nome}\n" +
-                                "${formatarData(vencimento)}  •  $status"
-
-                        textSize = 14f
-
-                        setTextColor(
-                            branco
-                        )
-
-                        gravity =
-                            Gravity.CENTER
-
-                        setPadding(
-                            12,
-                            8,
-                            12,
-                            8
-                        )
-
-                        background =
-                            GradientDrawable().apply {
-
-                                setColor(
-                                    Color.rgb(
-                                        15,
-                                        15,
-                                        15
-                                    )
-                                )
-
-                                setStroke(
-                                    2,
-                                    azul
-                                )
-
-                                cornerRadius =
-                                    14f
-                            }
-
-                        setOnClickListener {
-
-                            mostrarDetalhesCliente(
-                                cliente
-                            )
-                        }
-                    }
-
-                conteudo.addView(
-                    bloco,
-                    LinearLayout.LayoutParams(
-                        -1,
-                        78
-                    ).apply {
-                        topMargin = 5
-                        bottomMargin = 5
-                    }
-                )
-            }
-        }
-
-        conteudo.addView(
-            espaco(12)
-        )
-
-        conteudo.addView(
-            botao(
-                "VOLTAR",
-                cinzaBorda,
-                62,
-                15f
-            ) {
-
-                mostrarInicio()
-            }
-        )
-
-        adicionarNaTela(
-            tela,
-            criarAreaCentral(
-                conteudo
-            )
-        )
-    }
-
-    // ============================================================
-    // VOLTAR
-    // ============================================================
-
     @Deprecated("Compatibilidade com Android")
     override fun onBackPressed() {
-
         mostrarInicio()
     }
 }
