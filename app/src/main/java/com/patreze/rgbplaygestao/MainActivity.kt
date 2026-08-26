@@ -2,6 +2,7 @@ package com.patreze.rgbplaygestao
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
@@ -9,7 +10,9 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.MediaStore
 import android.text.Editable
 import android.text.InputFilter
 import android.text.InputType
@@ -22,7 +25,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
+import java.util.concurrent.Executors
 
 data class Cliente(
     var nome: String,
@@ -35,6 +40,8 @@ class MainActivity : Activity() {
     private val preferencias by lazy {
         getSharedPreferences("rgb_play_gestao", Context.MODE_PRIVATE)
     }
+
+    private val CODIGO_SELECIONAR_BACKUP = 1001
 
     // Cores Dark
     private val fundo = Color.rgb(5, 5, 5)
@@ -292,28 +299,164 @@ class MainActivity : Activity() {
         }
 
         conteudo.addView(criarLogo())
-        conteudo.addView(espaco(10))
+        conteudo.addView(espaco(6))
 
         conteudo.addView(
-            botao("ADICIONAR CLIENTE", vermelho, 72, 17f) {
+            botao("ADICIONAR CLIENTE", vermelho, 70, 16f) {
                 mostrarAdicionarCliente()
             }
         )
 
         conteudo.addView(
-            botao("VER CLIENTES", verde, 72, 17f) {
+            botao("VER CLIENTES", verde, 70, 16f) {
                 mostrarClientes()
             }
         )
 
         conteudo.addView(
-            botao("PRÓXIMOS VENCIMENTOS", azul, 72, 17f) {
+            botao("PRÓXIMOS VENCIMENTOS", azul, 70, 16f) {
                 mostrarProximosVencimentos()
             }
         )
 
+        conteudo.addView(espaco(12))
+
+        // Botões de Backup & Restauração
+        val containerBackup = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        val btnExportar = TextView(this).apply {
+            text = "EXPORTAR BACKUP"
+            textSize = 13f
+            setTextColor(branco)
+            gravity = Gravity.CENTER
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(8, dp(12), 8, dp(12))
+            background = GradientDrawable().apply {
+                setColor(Color.rgb(15, 15, 15))
+                setStroke(2, cinzaBorda)
+                cornerRadius = 14f
+            }
+            setOnClickListener { exportarBackup() }
+        }
+        val paramsExportar = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+            rightMargin = dp(4)
+        }
+        containerBackup.addView(btnExportar, paramsExportar)
+
+        val btnImportar = TextView(this).apply {
+            text = "RESTAURAR BACKUP"
+            textSize = 13f
+            setTextColor(branco)
+            gravity = Gravity.CENTER
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(8, dp(12), 8, dp(12))
+            background = GradientDrawable().apply {
+                setColor(Color.rgb(15, 15, 15))
+                setStroke(2, cinzaBorda)
+                cornerRadius = 14f
+            }
+            setOnClickListener { abrirSeletorArquivoBackup() }
+        }
+        val paramsImportar = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+            leftMargin = dp(4)
+        }
+        containerBackup.addView(btnImportar, paramsImportar)
+
+        conteudo.addView(containerBackup)
+
         val scroll = criarAreaCentral(conteudo)
         adicionarNaTela(tela, scroll)
+    }
+
+    // ============================================================
+    // BACKUP E RESTAURAÇÃO
+    // ============================================================
+
+    private fun exportarBackup() {
+        val textoClientes = preferencias.getString("clientes", "[]") ?: "[]"
+        if (textoClientes == "[]") {
+            Toast.makeText(this, "Nenhum cliente cadastrado para backup.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        Executors.newSingleThreadExecutor().execute {
+            try {
+                val nomeArquivo = "backup_rgb_play_" +
+                    SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(Date()) + ".json"
+                val bytes = textoClientes.toByteArray(Charsets.UTF_8)
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val values = ContentValues().apply {
+                        put(MediaStore.Downloads.DISPLAY_NAME, nomeArquivo)
+                        put(MediaStore.Downloads.MIME_TYPE, "application/json")
+                        put(MediaStore.Downloads.RELATIVE_PATH, "Download")
+                    }
+
+                    val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                        ?: throw Exception("Erro ao criar arquivo.")
+
+                    contentResolver.openOutputStream(uri).use { saida ->
+                        saida?.write(bytes)
+                    }
+
+                    runOnUiThread {
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "application/json"
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        startActivity(Intent.createChooser(intent, "Salvar backup / Enviar"))
+                    }
+                } else {
+                    runOnUiThread {
+                        Toast.makeText(this, "Requer Android 10 ou superior.", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    Toast.makeText(this, "Erro no backup: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun abrirSeletorArquivoBackup() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+        }
+        startActivityForResult(intent, CODIGO_SELECIONAR_BACKUP)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == CODIGO_SELECIONAR_BACKUP && resultCode == RESULT_OK) {
+            data?.data?.let { uri ->
+                restaurarBackup(uri)
+            }
+        }
+    }
+
+    private fun restaurarBackup(uri: Uri) {
+        try {
+            val conteudo = contentResolver.openInputStream(uri)?.bufferedReader().use { it?.readText() } ?: ""
+            val jsonArray = JSONArray(conteudo)
+            if (jsonArray.length() > 0) {
+                preferencias.edit().putString("clientes", conteudo).apply()
+                Toast.makeText(this, "${jsonArray.length()} clientes restaurados com sucesso!", Toast.LENGTH_LONG).show()
+                mostrarInicio()
+            } else {
+                Toast.makeText(this, "Arquivo vazio ou inválido.", Toast.LENGTH_SHORT).show()
+            }
+        } catch (_: Exception) {
+            Toast.makeText(this, "Falha ao ler arquivo de backup JSON.", Toast.LENGTH_SHORT).show()
+        }
     }
 
     // ============================================================
@@ -524,7 +667,6 @@ class MainActivity : Activity() {
                 linhaAtual?.addView(card, paramsCard)
             }
 
-            // Se for número ímpar, adiciona um espaço invisível na direita para manter o grid alinhado
             if (clientes.size % 2 != 0) {
                 val espacoVazio = Space(this).apply {
                     layoutParams = LinearLayout.LayoutParams(0, 1, 1f).apply {
