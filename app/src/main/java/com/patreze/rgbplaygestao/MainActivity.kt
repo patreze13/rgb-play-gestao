@@ -1,10 +1,12 @@
 package com.patreze.rgbplaygestao
 
+import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
@@ -21,6 +23,11 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.*
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -28,6 +35,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 data class Cliente(
     var nome: String,
@@ -42,6 +50,7 @@ class MainActivity : Activity() {
     }
 
     private val CODIGO_SELECIONAR_BACKUP = 1001
+    private val CODIGO_PERMISSAO_NOTIFICACAO = 1002
 
     // Cores Dark
     private val fundo = Color.rgb(5, 5, 5)
@@ -56,7 +65,41 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 1. Pede permissão de notificação no Android 13+
+        solicitarPermissaoNotificacao()
+
+        // 2. Agenda o Worker de vencimentos diários
+        agendarNotificacoesVencimento()
+
         mostrarInicio()
+    }
+
+    private fun solicitarPermissaoNotificacao() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    CODIGO_PERMISSAO_NOTIFICACAO
+                )
+            }
+        }
+    }
+
+    private fun agendarNotificacoesVencimento() {
+        try {
+            val requisicaoTrabalho = PeriodicWorkRequestBuilder<VencimentoWorker>(
+                24, TimeUnit.HOURS
+            ).build()
+
+            WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+                "VerificacaoVencimentos",
+                ExistingPeriodicWorkPolicy.KEEP,
+                requisicaoTrabalho
+            )
+        } catch (_: Exception) {
+        }
     }
 
     private fun carregarClientes(): MutableList<Cliente> {
