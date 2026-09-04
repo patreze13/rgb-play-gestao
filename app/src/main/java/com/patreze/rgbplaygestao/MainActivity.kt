@@ -34,13 +34,15 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.Stack
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 data class Cliente(
     var nome: String,
     var contato: String,
-    var dia: Int
+    var dia: Int,
+    var ultimoMesPago: String = "" // Formato "yyyy-MM" (ex: "2026-09")
 )
 
 class MainActivity : Activity() {
@@ -51,6 +53,10 @@ class MainActivity : Activity() {
 
     private val CODIGO_SELECIONAR_BACKUP = 1001
     private val CODIGO_PERMISSAO_NOTIFICACAO = 1002
+
+    // Histórico de navegação para resolver o gesto/botão de voltar
+    private val pilhaTelas = Stack<() -> Unit>()
+    private var navegandoVoltar = false
 
     // Cores Dark
     private val fundo = Color.rgb(5, 5, 5)
@@ -66,13 +72,18 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 1. Pede permissão de notificação no Android 13+
         solicitarPermissaoNotificacao()
-
-        // 2. Agenda o Worker de vencimentos diários
         agendarNotificacoesVencimento()
 
         mostrarInicio()
+    }
+
+    private fun navegarPara(acao: () -> Unit) {
+        if (!navegandoVoltar) {
+            pilhaTelas.push(acao)
+        }
+        navegandoVoltar = false
+        acao()
     }
 
     private fun solicitarPermissaoNotificacao() {
@@ -113,7 +124,8 @@ class MainActivity : Activity() {
                     Cliente(
                         nome = objeto.optString("nome"),
                         contato = objeto.optString("contato"),
-                        dia = objeto.optInt("dia")
+                        dia = objeto.optInt("dia"),
+                        ultimoMesPago = objeto.optString("ultimoMesPago", "")
                     )
                 )
             }
@@ -129,6 +141,7 @@ class MainActivity : Activity() {
                 put("nome", cliente.nome)
                 put("contato", cliente.contato)
                 put("dia", cliente.dia)
+                put("ultimoMesPago", cliente.ultimoMesPago)
             }
             array.put(objeto)
         }
@@ -136,11 +149,15 @@ class MainActivity : Activity() {
     }
 
     // ============================================================
-    // DATAS
+    // DATAS E CÁLCULO DE VENCIMENTO / BAIXA
     // ============================================================
 
-    private fun proximoVencimento(dia: Int): Calendar {
-        val hoje = Calendar.getInstance()
+    private fun chaveMes(cal: Calendar): String {
+        return SimpleDateFormat("yyyy-MM", Locale.US).format(cal.time)
+    }
+
+    private fun proximoVencimento(cliente: Cliente): Calendar {
+        val hoje = Calendar.getInstance().inicioDoDia()
         var ano = hoje.get(Calendar.YEAR)
         var mes = hoje.get(Calendar.MONTH)
 
@@ -150,9 +167,15 @@ class MainActivity : Activity() {
                 set(Calendar.MILLISECOND, 0)
             }
             val ultimoDia = tentativa.getActualMaximum(Calendar.DAY_OF_MONTH)
-            tentativa.set(ano, mes, minOf(dia, ultimoDia), 0, 0, 0)
+            tentativa.set(ano, mes, minOf(cliente.dia, ultimoDia), 0, 0, 0)
 
-            if (!tentativa.before(hoje.inicioDoDia())) {
+            val chaveTentativa = chaveMes(tentativa)
+
+            // Se ainda não venceu e o mês da tentativa ainda não foi quitado, é a data ideal
+            val naoPassouDeHoje = !tentativa.before(hoje)
+            val mesNaoPago = cliente.ultimoMesPago != chaveTentativa
+
+            if (naoPassouDeHoje && mesNaoPago) {
                 return tentativa
             }
 
@@ -335,6 +358,9 @@ class MainActivity : Activity() {
     // ============================================================
 
     private fun mostrarInicio() {
+        pilhaTelas.clear()
+        pilhaTelas.push { mostrarInicio() }
+
         val tela = criarBase()
         val conteudo = criarBase().apply {
             gravity = Gravity.CENTER
@@ -346,25 +372,24 @@ class MainActivity : Activity() {
 
         conteudo.addView(
             botao("ADICIONAR CLIENTE", vermelho, 70, 16f) {
-                mostrarAdicionarCliente()
+                navegarPara { mostrarAdicionarCliente() }
             }
         )
 
         conteudo.addView(
             botao("VER CLIENTES", verde, 70, 16f) {
-                mostrarClientes()
+                navegarPara { mostrarClientes() }
             }
         )
 
         conteudo.addView(
             botao("PRÓXIMOS VENCIMENTOS", azul, 70, 16f) {
-                mostrarProximosVencimentos()
+                navegarPara { mostrarProximosVencimentos() }
             }
         )
 
         conteudo.addView(espaco(12))
 
-        // Botões de Backup & Restauração
         val containerBackup = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
@@ -638,13 +663,13 @@ class MainActivity : Activity() {
 
                 salvarClientes(clientes)
                 Toast.makeText(this, if (editando) "Cliente atualizado." else "Cliente cadastrado.", Toast.LENGTH_SHORT).show()
-                mostrarInicio()
+                onBackPressed()
             }
         )
 
         conteudo.addView(
             botao("VOLTAR", cinzaBorda, 60, 15f) {
-                mostrarInicio()
+                onBackPressed()
             }
         )
 
@@ -652,7 +677,7 @@ class MainActivity : Activity() {
     }
 
     // ============================================================
-    // CLIENTES (GRID 2 COLUNAS)
+    // CLIENTES COM BUSCA (GRID 2 COLUNAS)
     // ============================================================
 
     private fun mostrarClientes() {
@@ -664,23 +689,48 @@ class MainActivity : Activity() {
 
         conteudo.addView(titulo("CLIENTES", 24f))
 
-        val clientes = carregarClientes()
-        clientes.sortBy { proximoVencimento(it.dia).timeInMillis }
+        val todosClientes = carregarClientes()
+        todosClientes.sortBy { proximoVencimento(it).timeInMillis }
 
-        if (clientes.isEmpty()) {
-            conteudo.addView(texto("Nenhum cliente cadastrado.", 15f))
-        } else {
-            val grid = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
+        // Barra de busca
+        val campoBusca = campo("Pesquisar por nome ou contato...").apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(50)
+            ).apply {
+                bottomMargin = dp(12)
+            }
+        }
+        conteudo.addView(campoBusca)
+
+        val containerLista = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+        conteudo.addView(containerLista)
+
+        fun renderizarCards(filtro: String) {
+            containerLista.removeAllViews()
+
+            val filtrados = if (filtro.isEmpty()) {
+                todosClientes
+            } else {
+                todosClientes.filter {
+                    it.nome.contains(filtro, ignoreCase = true) || it.contato.contains(filtro)
+                }
+            }
+
+            if (filtrados.isEmpty()) {
+                containerLista.addView(texto(if (filtro.isEmpty()) "Nenhum cliente cadastrado." else "Nenhum cliente encontrado.", 15f))
+                return
             }
 
             var linhaAtual: LinearLayout? = null
 
-            clientes.forEachIndexed { index, cliente ->
+            filtrados.forEachIndexed { index, cliente ->
                 if (index % 2 == 0) {
                     linhaAtual = LinearLayout(this).apply {
                         orientation = LinearLayout.HORIZONTAL
@@ -691,13 +741,13 @@ class MainActivity : Activity() {
                             bottomMargin = dp(10)
                         }
                     }
-                    grid.addView(linhaAtual)
+                    containerLista.addView(linhaAtual)
                 }
 
-                val dias = diasAte(proximoVencimento(cliente.dia))
+                val dias = diasAte(proximoVencimento(cliente))
                 val estaCritico = dias in 0L..3L
                 val card = criarCardQuadrado(cliente, estaCritico) {
-                    mostrarDetalhesCliente(cliente)
+                    navegarPara { mostrarDetalhesCliente(cliente) }
                 }
 
                 val paramsCard = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
@@ -710,7 +760,7 @@ class MainActivity : Activity() {
                 linhaAtual?.addView(card, paramsCard)
             }
 
-            if (clientes.size % 2 != 0) {
+            if (filtrados.size % 2 != 0) {
                 val espacoVazio = Space(this).apply {
                     layoutParams = LinearLayout.LayoutParams(0, 1, 1f).apply {
                         leftMargin = dp(5)
@@ -718,14 +768,22 @@ class MainActivity : Activity() {
                 }
                 linhaAtual?.addView(espacoVazio)
             }
-
-            conteudo.addView(grid)
         }
+
+        renderizarCards("")
+
+        campoBusca.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                renderizarCards(s?.toString()?.trim() ?: "")
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
 
         conteudo.addView(espaco(10))
         conteudo.addView(
             botao("VOLTAR", cinzaBorda, 60, 15f) {
-                mostrarInicio()
+                onBackPressed()
             }
         )
 
@@ -738,7 +796,7 @@ class MainActivity : Activity() {
         acao: () -> Unit
     ): LinearLayout {
         val corDestaque = if (critico) vermelho else verde
-        val vencimento = proximoVencimento(cliente.dia)
+        val vencimento = proximoVencimento(cliente)
 
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -800,11 +858,11 @@ class MainActivity : Activity() {
         conteudo.addView(titulo("PRÓXIMOS VENCIMENTOS", 22f))
 
         val clientes = carregarClientes().filter {
-            val vencimento = proximoVencimento(it.dia)
+            val vencimento = proximoVencimento(it)
             val dias = diasAte(vencimento)
             dias in 0L..3L
         }.sortedBy {
-            proximoVencimento(it.dia).timeInMillis
+            proximoVencimento(it).timeInMillis
         }
 
         if (clientes.isEmpty()) {
@@ -836,7 +894,7 @@ class MainActivity : Activity() {
                     grid.addView(linhaAtual)
                 }
 
-                val vencimento = proximoVencimento(cliente.dia)
+                val vencimento = proximoVencimento(cliente)
                 val dias = diasAte(vencimento)
                 val status = when (dias) {
                     0L -> "HOJE"
@@ -855,7 +913,9 @@ class MainActivity : Activity() {
                     }
                     isClickable = true
                     isFocusable = true
-                    setOnClickListener { mostrarDetalhesCliente(cliente) }
+                    setOnClickListener {
+                        navegarPara { mostrarDetalhesCliente(cliente) }
+                    }
                 }
 
                 val txtNome = TextView(this).apply {
@@ -912,7 +972,7 @@ class MainActivity : Activity() {
         conteudo.addView(espaco(12))
         conteudo.addView(
             botao("VOLTAR", cinzaBorda, 60, 15f) {
-                mostrarInicio()
+                onBackPressed()
             }
         )
 
@@ -932,7 +992,7 @@ class MainActivity : Activity() {
 
         conteudo.addView(titulo(cliente.nome, 23f))
 
-        val vencimento = proximoVencimento(cliente.dia)
+        val vencimento = proximoVencimento(cliente)
         val dias = diasAte(vencimento)
         val contatoExibicao = if (cliente.contato.isEmpty()) "Não informado" else cliente.contato
 
@@ -965,6 +1025,13 @@ class MainActivity : Activity() {
 
         conteudo.addView(espaco(10))
 
+        // Botão para dar baixa / renovar o mês
+        conteudo.addView(
+            botao("CONFIRMAR PAGAMENTO / RENOVAR", verde, 64, 15f) {
+                confirmarBaixaPagamento(cliente)
+            }
+        )
+
         if (cliente.contato.isNotEmpty()) {
             conteudo.addView(
                 botao("ABRIR WHATSAPP", verde, 64, 16f) {
@@ -975,7 +1042,7 @@ class MainActivity : Activity() {
 
         conteudo.addView(
             botao("EDITAR CLIENTE", azul, 64, 16f) {
-                mostrarAdicionarCliente(cliente)
+                navegarPara { mostrarAdicionarCliente(cliente) }
             }
         )
 
@@ -987,11 +1054,33 @@ class MainActivity : Activity() {
 
         conteudo.addView(
             botao("VOLTAR", cinzaBorda, 60, 15f) {
-                mostrarClientes()
+                onBackPressed()
             }
         )
 
         adicionarNaTela(tela, criarAreaCentral(conteudo))
+    }
+
+    private fun confirmarBaixaPagamento(cliente: Cliente) {
+        val vencimentoAtual = proximoVencimento(cliente)
+        val dataFormatada = formatarData(vencimentoAtual)
+
+        AlertDialog.Builder(this)
+            .setTitle("Confirmar Pagamento")
+            .setMessage("Confirmar pagamento referente ao vencimento de $dataFormatada?\nO próximo vencimento irá para o mês seguinte.")
+            .setNegativeButton("CANCELAR", null)
+            .setPositiveButton("CONFIRMAR") { _, _ ->
+                val clientes = carregarClientes()
+                val cli = clientes.find { it.nome == cliente.nome }
+                if (cli != null) {
+                    cli.ultimoMesPago = chaveMes(vencimentoAtual)
+                    salvarClientes(clientes)
+                    cliente.ultimoMesPago = cli.ultimoMesPago
+                    Toast.makeText(this, "Pagamento confirmado! Renovado até o próximo mês.", Toast.LENGTH_SHORT).show()
+                    mostrarDetalhesCliente(cliente)
+                }
+            }
+            .show()
     }
 
     private fun abrirWhatsApp(contato: String) {
@@ -1028,13 +1117,21 @@ class MainActivity : Activity() {
                 val clientes = carregarClientes()
                 clientes.removeAll { it.nome == cliente.nome }
                 salvarClientes(clientes)
-                mostrarClientes()
+                onBackPressed()
             }
             .show()
     }
 
     @Deprecated("Compatibilidade com Android")
     override fun onBackPressed() {
-        mostrarInicio()
+        if (pilhaTelas.size > 1) {
+            pilhaTelas.pop() // Remove a tela atual
+            val telaAnterior = pilhaTelas.peek()
+            navegandoVoltar = true
+            telaAnterior.invoke()
+        } else {
+            // Se estiver na tela inicial, minimiza ou fecha normalmente
+            finish()
+        }
     }
 }
