@@ -1,6 +1,7 @@
 package com.patreze.rgbplaygestao
 
 import android.Manifest
+import android.app.Activity
 import android.app.AlertDialog
 import android.content.ContentValues
 import android.content.Context
@@ -22,8 +23,6 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.*
-import androidx.activity.ComponentActivity
-import androidx.activity.OnBackPressedCallback
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -43,10 +42,10 @@ data class Cliente(
     var nome: String,
     var contato: String,
     var dia: Int,
-    var ultimoMesPago: String = "" // Formato "yyyy-MM"
+    var ultimoMesPago: String = ""
 )
 
-class MainActivity : ComponentActivity() {
+class MainActivity : Activity() {
 
     private val preferencias by lazy {
         getSharedPreferences("rgb_play_gestao", Context.MODE_PRIVATE)
@@ -58,7 +57,6 @@ class MainActivity : ComponentActivity() {
     private val pilhaTelas = Stack<() -> Unit>()
     private var navegandoVoltar = false
 
-    // Cores Dark com contraste elegante
     private val fundoCard = Color.rgb(20, 20, 22)
     private val fundoCampo = Color.rgb(18, 18, 20)
     private val branco = Color.rgb(255, 255, 255)
@@ -70,20 +68,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Suporte perfeito para gestos de voltar do Android
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                if (pilhaTelas.size > 1) {
-                    pilhaTelas.pop()
-                    val telaAnterior = pilhaTelas.peek()
-                    navegandoVoltar = true
-                    telaAnterior.invoke()
-                } else {
-                    finish()
-                }
-            }
-        })
 
         solicitarPermissaoNotificacao()
         agendarNotificacoesVencimento()
@@ -97,6 +81,17 @@ class MainActivity : ComponentActivity() {
         }
         navegandoVoltar = false
         acao()
+    }
+
+    override fun onBackPressed() {
+        if (pilhaTelas.size > 1) {
+            pilhaTelas.pop()
+            val telaAnterior = pilhaTelas.peek()
+            navegandoVoltar = true
+            telaAnterior.invoke()
+        } else {
+            finish()
+        }
     }
 
     private fun solicitarPermissaoNotificacao() {
@@ -161,10 +156,6 @@ class MainActivity : ComponentActivity() {
         preferencias.edit().putString("clientes", array.toString()).apply()
     }
 
-    // ============================================================
-    // DATAS E CÁLCULO DE VENCIMENTO
-    // ============================================================
-
     private fun chaveMes(cal: Calendar): String {
         return SimpleDateFormat("yyyy-MM", Locale.US).format(cal.time)
     }
@@ -183,7 +174,6 @@ class MainActivity : ComponentActivity() {
             tentativa.set(ano, mes, minOf(cliente.dia, ultimoDia), 0, 0, 0)
 
             val chaveTentativa = chaveMes(tentativa)
-
             val naoPassouDeHoje = !tentativa.before(hoje)
             val mesNaoPago = cliente.ultimoMesPago != chaveTentativa
 
@@ -221,10 +211,6 @@ class MainActivity : ComponentActivity() {
     private fun formatarDiaMes(calendario: Calendar): String {
         return SimpleDateFormat("dd/MM", Locale("pt", "BR")).format(calendario.time)
     }
-
-    // ============================================================
-    // BASE VISUAL COM TEXTURA / DEGRADÊ PROFUNDO
-    // ============================================================
 
     private fun obterFundoComTextura(): GradientDrawable {
         return GradientDrawable(
@@ -338,10 +324,6 @@ class MainActivity : ComponentActivity() {
         return (valor * densidade).toInt()
     }
 
-    // ============================================================
-    // LOGO
-    // ============================================================
-
     private fun criarLogo(): LinearLayout {
         val caixa = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -375,10 +357,6 @@ class MainActivity : ComponentActivity() {
         caixa.addView(subtitulo)
         return caixa
     }
-
-    // ============================================================
-    // INÍCIO
-    // ============================================================
 
     private fun mostrarInicio() {
         pilhaTelas.clear()
@@ -465,10 +443,6 @@ class MainActivity : ComponentActivity() {
         adicionarNaTela(tela, scroll)
     }
 
-    // ============================================================
-    // BACKUP E RESTAURAÇÃO
-    // ============================================================
-
     private fun exportarBackup() {
         val textoClientes = preferencias.getString("clientes", "[]") ?: "[]"
         if (textoClientes == "[]") {
@@ -549,10 +523,6 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, "Falha ao ler arquivo de backup JSON.", Toast.LENGTH_SHORT).show()
         }
     }
-
-    // ============================================================
-    // FORMULÁRIO ADICIONAR / EDITAR
-    // ============================================================
 
     private fun campo(dica: String, tipo: Int = InputType.TYPE_CLASS_TEXT): EditText {
         return EditText(this).apply {
@@ -675,7 +645,6 @@ class MainActivity : ComponentActivity() {
                         return@botao
                     }
 
-                    // Ao cadastrar hoje, o ciclo atual já entra como quitado (próxima cobrança vai para o mês que vem)
                     val mesAtualQuitado = SimpleDateFormat("yyyy-MM", Locale.US).format(Date())
                     clientes.add(Cliente(nomeTexto, contatoTexto, diaNumero, ultimoMesPago = mesAtualQuitado))
                 } else {
@@ -689,22 +658,18 @@ class MainActivity : ComponentActivity() {
 
                 salvarClientes(clientes)
                 Toast.makeText(this, if (editando) "Cliente atualizado." else "Cliente cadastrado com sucesso!", Toast.LENGTH_SHORT).show()
-                onBackPressedDispatcher.onBackPressed()
+                onBackPressed()
             }
         )
 
         conteudo.addView(
             botao("VOLTAR", cinzaBorda, 56, 14f) {
-                onBackPressedDispatcher.onBackPressed()
+                onBackPressed()
             }
         )
 
         adicionarNaTela(tela, criarAreaCentral(conteudo))
     }
-
-    // ============================================================
-    // CLIENTES - LISTA RETANGULAR FINA (OTIMIZADA)
-    // ============================================================
 
     private fun mostrarClientes() {
         val tela = criarBase()
@@ -785,14 +750,13 @@ class MainActivity : ComponentActivity() {
         conteudo.addView(espaco(10))
         conteudo.addView(
             botao("VOLTAR", cinzaBorda, 56, 14f) {
-                onBackPressedDispatcher.onBackPressed()
+                onBackPressed()
             }
         )
 
         adicionarNaTela(tela, criarAreaCentral(conteudo))
     }
 
-    // Card em formato de linha retangular de fora a fora
     private fun criarCardRetangular(
         cliente: Cliente,
         critico: Boolean,
@@ -814,7 +778,6 @@ class MainActivity : ComponentActivity() {
             isFocusable = true
             setOnClickListener { acao() }
 
-            // Lado Esquerdo: Nome e Dia Base
             val colunaInfo = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
@@ -840,7 +803,6 @@ class MainActivity : ComponentActivity() {
 
             addView(colunaInfo)
 
-            // Lado Direito: Data do próximo vencimento destacada
             val colunaData = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.END
@@ -872,10 +834,6 @@ class MainActivity : ComponentActivity() {
             addView(colunaData)
         }
     }
-
-    // ============================================================
-    // PRÓXIMOS VENCIMENTOS (RETANGULAR)
-    // ============================================================
 
     private fun mostrarProximosVencimentos() {
         val tela = criarBase()
@@ -929,16 +887,12 @@ class MainActivity : ComponentActivity() {
         conteudo.addView(espaco(12))
         conteudo.addView(
             botao("VOLTAR", cinzaBorda, 56, 14f) {
-                onBackPressedDispatcher.onBackPressed()
+                onBackPressed()
             }
         )
 
         adicionarNaTela(tela, criarAreaCentral(conteudo))
     }
-
-    // ============================================================
-    // DETALHES DO CLIENTE
-    // ============================================================
 
     private fun mostrarDetalhesCliente(cliente: Cliente) {
         val tela = criarBase()
@@ -1010,7 +964,7 @@ class MainActivity : ComponentActivity() {
 
         conteudo.addView(
             botao("VOLTAR", cinzaBorda, 56, 14f) {
-                onBackPressedDispatcher.onBackPressed()
+                onBackPressed()
             }
         )
 
@@ -1073,7 +1027,7 @@ class MainActivity : ComponentActivity() {
                 val clientes = carregarClientes()
                 clientes.removeAll { it.nome == cliente.nome }
                 salvarClientes(clientes)
-                onBackPressedDispatcher.onBackPressed()
+                onBackPressed()
             }
             .show()
     }
