@@ -1,7 +1,6 @@
 package com.patreze.rgbplaygestao
 
 import android.Manifest
-import android.app.Activity
 import android.app.AlertDialog
 import android.content.ContentValues
 import android.content.Context
@@ -23,6 +22,8 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.*
+import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -42,10 +43,10 @@ data class Cliente(
     var nome: String,
     var contato: String,
     var dia: Int,
-    var ultimoMesPago: String = "" // Formato "yyyy-MM" (ex: "2026-09")
+    var ultimoMesPago: String = "" // Formato "yyyy-MM"
 )
 
-class MainActivity : Activity() {
+class MainActivity : ComponentActivity() {
 
     private val preferencias by lazy {
         getSharedPreferences("rgb_play_gestao", Context.MODE_PRIVATE)
@@ -54,23 +55,35 @@ class MainActivity : Activity() {
     private val CODIGO_SELECIONAR_BACKUP = 1001
     private val CODIGO_PERMISSAO_NOTIFICACAO = 1002
 
-    // Histórico de navegação para resolver o gesto/botão de voltar
     private val pilhaTelas = Stack<() -> Unit>()
     private var navegandoVoltar = false
 
-    // Cores Dark
-    private val fundo = Color.rgb(5, 5, 5)
-    private val fundoCard = Color.rgb(18, 18, 18)
-    private val fundoCampo = Color.rgb(15, 15, 15)
+    // Cores Dark com contraste elegante
+    private val fundoCard = Color.rgb(20, 20, 22)
+    private val fundoCampo = Color.rgb(18, 18, 20)
     private val branco = Color.rgb(255, 255, 255)
     private val cinza = Color.rgb(160, 160, 160)
-    private val cinzaBorda = Color.rgb(70, 70, 70)
-    private val verde = Color.rgb(0, 200, 83)
-    private val vermelho = Color.rgb(244, 67, 54)
+    private val cinzaBorda = Color.rgb(55, 55, 60)
+    private val verde = Color.rgb(0, 230, 118)
+    private val vermelho = Color.rgb(255, 61, 0)
     private val azul = Color.rgb(41, 121, 255)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Suporte perfeito para gestos de voltar do Android
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (pilhaTelas.size > 1) {
+                    pilhaTelas.pop()
+                    val telaAnterior = pilhaTelas.peek()
+                    navegandoVoltar = true
+                    telaAnterior.invoke()
+                } else {
+                    finish()
+                }
+            }
+        })
 
         solicitarPermissaoNotificacao()
         agendarNotificacoesVencimento()
@@ -149,7 +162,7 @@ class MainActivity : Activity() {
     }
 
     // ============================================================
-    // DATAS E CÁLCULO DE VENCIMENTO / BAIXA
+    // DATAS E CÁLCULO DE VENCIMENTO
     // ============================================================
 
     private fun chaveMes(cal: Calendar): String {
@@ -171,7 +184,6 @@ class MainActivity : Activity() {
 
             val chaveTentativa = chaveMes(tentativa)
 
-            // Se ainda não venceu e o mês da tentativa ainda não foi quitado, é a data ideal
             val naoPassouDeHoje = !tentativa.before(hoje)
             val mesNaoPago = cliente.ultimoMesPago != chaveTentativa
 
@@ -211,15 +223,26 @@ class MainActivity : Activity() {
     }
 
     // ============================================================
-    // BASE VISUAL
+    // BASE VISUAL COM TEXTURA / DEGRADÊ PROFUNDO
     // ============================================================
+
+    private fun obterFundoComTextura(): GradientDrawable {
+        return GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(
+                Color.rgb(20, 20, 24),
+                Color.rgb(10, 10, 12),
+                Color.rgb(5, 5, 6)
+            )
+        )
+    }
 
     private fun criarBase(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setBackgroundColor(fundo)
-            setPadding(24, 24, 24, 24)
+            background = obterFundoComTextura()
+            setPadding(dp(20), dp(16), dp(20), dp(16))
         }
     }
 
@@ -227,7 +250,7 @@ class MainActivity : Activity() {
         val scroll = ScrollView(this).apply {
             isFillViewport = true
             overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
-            setBackgroundColor(fundo)
+            background = obterFundoComTextura()
         }
         scroll.addView(
             conteudo,
@@ -251,14 +274,14 @@ class MainActivity : Activity() {
         setContentView(tela)
     }
 
-    private fun titulo(texto: String, tamanho: Float = 24f): TextView {
+    private fun titulo(texto: String, tamanho: Float = 22f): TextView {
         return TextView(this).apply {
             text = texto
             textSize = tamanho
             setTextColor(branco)
             gravity = Gravity.CENTER
             typeface = Typeface.DEFAULT_BOLD
-            setPadding(8, 0, 8, 16)
+            setPadding(8, dp(6), 8, dp(14))
         }
     }
 
@@ -275,8 +298,8 @@ class MainActivity : Activity() {
     private fun botao(
         texto: String,
         corBorda: Int,
-        altura: Int = 68,
-        tamanhoFonte: Float = 16f,
+        altura: Int = 62,
+        tamanhoFonte: Float = 15f,
         acao: () -> Unit
     ): TextView {
         return TextView(this).apply {
@@ -288,9 +311,9 @@ class MainActivity : Activity() {
             maxLines = 2
             setPadding(18, 8, 18, 8)
             background = GradientDrawable().apply {
-                setColor(Color.rgb(10, 10, 10))
-                setStroke(3, corBorda)
-                cornerRadius = 18f
+                setColor(Color.rgb(16, 16, 18))
+                setStroke(dp(2), corBorda)
+                cornerRadius = dp(16).toFloat()
             }
             isClickable = true
             setOnClickListener { acao() }
@@ -323,7 +346,7 @@ class MainActivity : Activity() {
         val caixa = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(10, dp(10), 10, dp(20))
+            setPadding(10, dp(6), 10, dp(16))
         }
 
         val logo = ImageView(this).apply {
@@ -335,14 +358,14 @@ class MainActivity : Activity() {
         caixa.addView(
             logo,
             LinearLayout.LayoutParams(
-                dp(220),
-                dp(180)
+                dp(210),
+                dp(160)
             )
         )
 
         val subtitulo = TextView(this).apply {
             text = "GESTÃO DE CLIENTES"
-            textSize = 13f
+            textSize = 12f
             setTextColor(cinza)
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
@@ -364,26 +387,26 @@ class MainActivity : Activity() {
         val tela = criarBase()
         val conteudo = criarBase().apply {
             gravity = Gravity.CENTER
-            setPadding(20, 20, 20, 20)
+            setPadding(dp(16), dp(16), dp(16), dp(16))
         }
 
         conteudo.addView(criarLogo())
         conteudo.addView(espaco(6))
 
         conteudo.addView(
-            botao("ADICIONAR CLIENTE", vermelho, 70, 16f) {
+            botao("ADICIONAR CLIENTE", vermelho, 64, 15f) {
                 navegarPara { mostrarAdicionarCliente() }
             }
         )
 
         conteudo.addView(
-            botao("VER CLIENTES", verde, 70, 16f) {
+            botao("VER CLIENTES", verde, 64, 15f) {
                 navegarPara { mostrarClientes() }
             }
         )
 
         conteudo.addView(
-            botao("PRÓXIMOS VENCIMENTOS", azul, 70, 16f) {
+            botao("PRÓXIMOS VENCIMENTOS", azul, 64, 15f) {
                 navegarPara { mostrarProximosVencimentos() }
             }
         )
@@ -400,39 +423,39 @@ class MainActivity : Activity() {
 
         val btnExportar = TextView(this).apply {
             text = "EXPORTAR BACKUP"
-            textSize = 13f
+            textSize = 12f
             setTextColor(branco)
             gravity = Gravity.CENTER
             typeface = Typeface.DEFAULT_BOLD
             setPadding(8, dp(12), 8, dp(12))
             background = GradientDrawable().apply {
-                setColor(Color.rgb(15, 15, 15))
+                setColor(Color.rgb(18, 18, 20))
                 setStroke(2, cinzaBorda)
-                cornerRadius = 14f
+                cornerRadius = dp(14).toFloat()
             }
             setOnClickListener { exportarBackup() }
         }
         val paramsExportar = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-            rightMargin = dp(4)
+            rightMargin = dp(6)
         }
         containerBackup.addView(btnExportar, paramsExportar)
 
         val btnImportar = TextView(this).apply {
             text = "RESTAURAR BACKUP"
-            textSize = 13f
+            textSize = 12f
             setTextColor(branco)
             gravity = Gravity.CENTER
             typeface = Typeface.DEFAULT_BOLD
             setPadding(8, dp(12), 8, dp(12))
             background = GradientDrawable().apply {
-                setColor(Color.rgb(15, 15, 15))
+                setColor(Color.rgb(18, 18, 20))
                 setStroke(2, cinzaBorda)
-                cornerRadius = 14f
+                cornerRadius = dp(14).toFloat()
             }
             setOnClickListener { abrirSeletorArquivoBackup() }
         }
         val paramsImportar = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-            leftMargin = dp(4)
+            leftMargin = dp(6)
         }
         containerBackup.addView(btnImportar, paramsImportar)
 
@@ -534,7 +557,7 @@ class MainActivity : Activity() {
     private fun campo(dica: String, tipo: Int = InputType.TYPE_CLASS_TEXT): EditText {
         return EditText(this).apply {
             hint = dica
-            setHintTextColor(ColorStateList.valueOf(Color.rgb(130, 130, 130)))
+            setHintTextColor(ColorStateList.valueOf(Color.rgb(120, 120, 125)))
             setTextColor(branco)
             textSize = 15f
             inputType = tipo
@@ -543,7 +566,7 @@ class MainActivity : Activity() {
             background = GradientDrawable().apply {
                 setColor(fundoCampo)
                 setStroke(1, cinzaBorda)
-                cornerRadius = 14f
+                cornerRadius = dp(14).toFloat()
             }
         }
     }
@@ -589,10 +612,10 @@ class MainActivity : Activity() {
         val tela = criarBase()
         val conteudo = criarBase().apply {
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, dp(15), 0, dp(15))
+            setPadding(dp(4), dp(10), dp(4), dp(10))
         }
 
-        conteudo.addView(titulo(if (editando) "EDITAR CLIENTE" else "ADICIONAR CLIENTE", 24f))
+        conteudo.addView(titulo(if (editando) "EDITAR CLIENTE" else "ADICIONAR CLIENTE", 22f))
 
         val nome = campo("Nome do cliente")
         val contato = campo("WhatsApp / telefone", InputType.TYPE_CLASS_PHONE)
@@ -610,7 +633,7 @@ class MainActivity : Activity() {
 
         val paramsCampo = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            dp(56)
+            dp(54)
         ).apply {
             topMargin = dp(6)
             bottomMargin = dp(6)
@@ -626,8 +649,8 @@ class MainActivity : Activity() {
             botao(
                 if (editando) "SALVAR ALTERAÇÕES" else "CADASTRAR CLIENTE",
                 if (editando) azul else verde,
-                68,
-                16f
+                62,
+                15f
             ) {
                 val nomeTexto = nome.text.toString().trim()
                 val contatoTexto = contato.text.toString().trim()
@@ -651,7 +674,10 @@ class MainActivity : Activity() {
                         Toast.makeText(this, "Esse cliente já está cadastrado.", Toast.LENGTH_SHORT).show()
                         return@botao
                     }
-                    clientes.add(Cliente(nomeTexto, contatoTexto, diaNumero))
+
+                    // Ao cadastrar hoje, o ciclo atual já entra como quitado (próxima cobrança vai para o mês que vem)
+                    val mesAtualQuitado = SimpleDateFormat("yyyy-MM", Locale.US).format(Date())
+                    clientes.add(Cliente(nomeTexto, contatoTexto, diaNumero, ultimoMesPago = mesAtualQuitado))
                 } else {
                     val cliente = clientes.find { it.nome == clienteExistente!!.nome }
                     if (cliente != null) {
@@ -662,14 +688,14 @@ class MainActivity : Activity() {
                 }
 
                 salvarClientes(clientes)
-                Toast.makeText(this, if (editando) "Cliente atualizado." else "Cliente cadastrado.", Toast.LENGTH_SHORT).show()
-                onBackPressed()
+                Toast.makeText(this, if (editando) "Cliente atualizado." else "Cliente cadastrado com sucesso!", Toast.LENGTH_SHORT).show()
+                onBackPressedDispatcher.onBackPressed()
             }
         )
 
         conteudo.addView(
-            botao("VOLTAR", cinzaBorda, 60, 15f) {
-                onBackPressed()
+            botao("VOLTAR", cinzaBorda, 56, 14f) {
+                onBackPressedDispatcher.onBackPressed()
             }
         )
 
@@ -677,28 +703,27 @@ class MainActivity : Activity() {
     }
 
     // ============================================================
-    // CLIENTES COM BUSCA (GRID 2 COLUNAS)
+    // CLIENTES - LISTA RETANGULAR FINA (OTIMIZADA)
     // ============================================================
 
     private fun mostrarClientes() {
         val tela = criarBase()
         val conteudo = criarBase().apply {
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, dp(10), 0, dp(10))
+            setPadding(dp(4), dp(8), dp(4), dp(8))
         }
 
-        conteudo.addView(titulo("CLIENTES", 24f))
+        conteudo.addView(titulo("CLIENTES", 22f))
 
         val todosClientes = carregarClientes()
         todosClientes.sortBy { proximoVencimento(it).timeInMillis }
 
-        // Barra de busca
         val campoBusca = campo("Pesquisar por nome ou contato...").apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(50)
+                dp(48)
             ).apply {
-                bottomMargin = dp(12)
+                bottomMargin = dp(14)
             }
         }
         conteudo.addView(campoBusca)
@@ -712,7 +737,7 @@ class MainActivity : Activity() {
         }
         conteudo.addView(containerLista)
 
-        fun renderizarCards(filtro: String) {
+        fun renderizarLista(filtro: String) {
             containerLista.removeAllViews()
 
             val filtrados = if (filtro.isEmpty()) {
@@ -728,69 +753,47 @@ class MainActivity : Activity() {
                 return
             }
 
-            var linhaAtual: LinearLayout? = null
-
-            filtrados.forEachIndexed { index, cliente ->
-                if (index % 2 == 0) {
-                    linhaAtual = LinearLayout(this).apply {
-                        orientation = LinearLayout.HORIZONTAL
-                        layoutParams = LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.MATCH_PARENT,
-                            LinearLayout.LayoutParams.WRAP_CONTENT
-                        ).apply {
-                            bottomMargin = dp(10)
-                        }
-                    }
-                    containerLista.addView(linhaAtual)
-                }
-
+            filtrados.forEach { cliente ->
                 val dias = diasAte(proximoVencimento(cliente))
                 val estaCritico = dias in 0L..3L
-                val card = criarCardQuadrado(cliente, estaCritico) {
+                val card = criarCardRetangular(cliente, estaCritico) {
                     navegarPara { mostrarDetalhesCliente(cliente) }
                 }
 
-                val paramsCard = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                    if (index % 2 == 0) {
-                        rightMargin = dp(5)
-                    } else {
-                        leftMargin = dp(5)
+                containerLista.addView(
+                    card,
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        bottomMargin = dp(8)
                     }
-                }
-                linhaAtual?.addView(card, paramsCard)
-            }
-
-            if (filtrados.size % 2 != 0) {
-                val espacoVazio = Space(this).apply {
-                    layoutParams = LinearLayout.LayoutParams(0, 1, 1f).apply {
-                        leftMargin = dp(5)
-                    }
-                }
-                linhaAtual?.addView(espacoVazio)
+                )
             }
         }
 
-        renderizarCards("")
+        renderizarLista("")
 
         campoBusca.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                renderizarCards(s?.toString()?.trim() ?: "")
+                renderizarLista(s?.toString()?.trim() ?: "")
             }
             override fun afterTextChanged(s: Editable?) {}
         })
 
         conteudo.addView(espaco(10))
         conteudo.addView(
-            botao("VOLTAR", cinzaBorda, 60, 15f) {
-                onBackPressed()
+            botao("VOLTAR", cinzaBorda, 56, 14f) {
+                onBackPressedDispatcher.onBackPressed()
             }
         )
 
         adicionarNaTela(tela, criarAreaCentral(conteudo))
     }
 
-    private fun criarCardQuadrado(
+    // Card em formato de linha retangular de fora a fora
+    private fun criarCardRetangular(
         cliente: Cliente,
         critico: Boolean,
         acao: () -> Unit
@@ -798,61 +801,87 @@ class MainActivity : Activity() {
         val corDestaque = if (critico) vermelho else verde
         val vencimento = proximoVencimento(cliente)
 
-        val card = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(dp(12), dp(16), dp(12), dp(16))
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(12), dp(16), dp(12))
             background = GradientDrawable().apply {
                 setColor(fundoCard)
-                setStroke(dp(2), corDestaque)
-                cornerRadius = 16f
+                setStroke(dp(1), corDestaque)
+                cornerRadius = dp(12).toFloat()
             }
             isClickable = true
             isFocusable = true
             setOnClickListener { acao() }
-        }
 
-        val txtNome = TextView(this).apply {
-            text = cliente.nome
-            textSize = 15f
-            setTextColor(branco)
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-            maxLines = 2
-            ellipsize = android.text.TextUtils.TruncateAt.END
-        }
-        card.addView(txtNome)
+            // Lado Esquerdo: Nome e Dia Base
+            val colunaInfo = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
 
-        val txtDia = TextView(this).apply {
-            text = "Dia ${cliente.dia}"
-            textSize = 12f
-            setTextColor(cinza)
-            gravity = Gravity.CENTER
-            setPadding(0, dp(4), 0, dp(2))
-        }
-        card.addView(txtDia)
+            val txtNome = TextView(context).apply {
+                text = cliente.nome
+                textSize = 15f
+                setTextColor(branco)
+                typeface = Typeface.DEFAULT_BOLD
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            }
+            colunaInfo.addView(txtNome)
 
-        val txtVenc = TextView(this).apply {
-            text = formatarDiaMes(vencimento)
-            textSize = 13f
-            setTextColor(corDestaque)
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-        }
-        card.addView(txtVenc)
+            val txtSub = TextView(context).apply {
+                text = "Todo dia ${cliente.dia}"
+                textSize = 12f
+                setTextColor(cinza)
+                setPadding(0, dp(2), 0, 0)
+            }
+            colunaInfo.addView(txtSub)
 
-        return card
+            addView(colunaInfo)
+
+            // Lado Direito: Data do próximo vencimento destacada
+            val colunaData = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.END
+            }
+
+            val txtVenc = TextView(context).apply {
+                text = formatarDiaMes(vencimento)
+                textSize = 16f
+                setTextColor(corDestaque)
+                typeface = Typeface.DEFAULT_BOLD
+            }
+            colunaData.addView(txtVenc)
+
+            val dias = diasAte(vencimento)
+            val labelStatus = when (dias) {
+                0L -> "Hoje"
+                1L -> "Amanhã"
+                in 2L..3L -> "Em $dias d"
+                else -> "Em dia"
+            }
+
+            val txtLabel = TextView(context).apply {
+                text = labelStatus
+                textSize = 11f
+                setTextColor(if (critico) vermelho else cinza)
+            }
+            colunaData.addView(txtLabel)
+
+            addView(colunaData)
+        }
     }
 
     // ============================================================
-    // PRÓXIMOS VENCIMENTOS (GRID 2 COLUNAS)
+    // PRÓXIMOS VENCIMENTOS (RETANGULAR)
     // ============================================================
 
     private fun mostrarProximosVencimentos() {
         val tela = criarBase()
         val conteudo = criarBase().apply {
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, dp(10), 0, dp(10))
+            setPadding(dp(4), dp(8), dp(4), dp(8))
         }
 
         conteudo.addView(titulo("PRÓXIMOS VENCIMENTOS", 22f))
@@ -867,10 +896,10 @@ class MainActivity : Activity() {
 
         if (clientes.isEmpty()) {
             conteudo.addView(
-                texto("Nenhum cliente vence\nnos próximos 3 dias.", 16f)
+                texto("Nenhum cliente vence\nnos próximos 3 dias.", 15f)
             )
         } else {
-            val grid = LinearLayout(this).apply {
+            val container = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -878,101 +907,29 @@ class MainActivity : Activity() {
                 )
             }
 
-            var linhaAtual: LinearLayout? = null
+            clientes.forEach { cliente ->
+                val card = criarCardRetangular(cliente, true) {
+                    navegarPara { mostrarDetalhesCliente(cliente) }
+                }
 
-            clientes.forEachIndexed { index, cliente ->
-                if (index % 2 == 0) {
-                    linhaAtual = LinearLayout(this).apply {
-                        orientation = LinearLayout.HORIZONTAL
-                        layoutParams = LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.MATCH_PARENT,
-                            LinearLayout.LayoutParams.WRAP_CONTENT
-                        ).apply {
-                            bottomMargin = dp(10)
-                        }
+                container.addView(
+                    card,
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        bottomMargin = dp(8)
                     }
-                    grid.addView(linhaAtual)
-                }
-
-                val vencimento = proximoVencimento(cliente)
-                val dias = diasAte(vencimento)
-                val status = when (dias) {
-                    0L -> "HOJE"
-                    1L -> "AMANHÃ"
-                    else -> "EM $dias DIAS"
-                }
-
-                val card = LinearLayout(this).apply {
-                    orientation = LinearLayout.VERTICAL
-                    gravity = Gravity.CENTER
-                    setPadding(dp(12), dp(16), dp(12), dp(16))
-                    background = GradientDrawable().apply {
-                        setColor(fundoCard)
-                        setStroke(dp(2), vermelho)
-                        cornerRadius = 16f
-                    }
-                    isClickable = true
-                    isFocusable = true
-                    setOnClickListener {
-                        navegarPara { mostrarDetalhesCliente(cliente) }
-                    }
-                }
-
-                val txtNome = TextView(this).apply {
-                    text = cliente.nome
-                    textSize = 15f
-                    setTextColor(branco)
-                    typeface = Typeface.DEFAULT_BOLD
-                    gravity = Gravity.CENTER
-                    maxLines = 2
-                    ellipsize = android.text.TextUtils.TruncateAt.END
-                }
-                card.addView(txtNome)
-
-                val txtData = TextView(this).apply {
-                    text = formatarData(vencimento)
-                    textSize = 12f
-                    setTextColor(cinza)
-                    gravity = Gravity.CENTER
-                    setPadding(0, dp(4), 0, dp(2))
-                }
-                card.addView(txtData)
-
-                val txtStatus = TextView(this).apply {
-                    text = status
-                    textSize = 13f
-                    setTextColor(vermelho)
-                    typeface = Typeface.DEFAULT_BOLD
-                    gravity = Gravity.CENTER
-                }
-                card.addView(txtStatus)
-
-                val paramsCard = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                    if (index % 2 == 0) {
-                        rightMargin = dp(5)
-                    } else {
-                        leftMargin = dp(5)
-                    }
-                }
-                linhaAtual?.addView(card, paramsCard)
+                )
             }
 
-            if (clientes.size % 2 != 0) {
-                val espacoVazio = Space(this).apply {
-                    layoutParams = LinearLayout.LayoutParams(0, 1, 1f).apply {
-                        leftMargin = dp(5)
-                    }
-                }
-                linhaAtual?.addView(espacoVazio)
-            }
-
-            conteudo.addView(grid)
+            conteudo.addView(container)
         }
 
         conteudo.addView(espaco(12))
         conteudo.addView(
-            botao("VOLTAR", cinzaBorda, 60, 15f) {
-                onBackPressed()
+            botao("VOLTAR", cinzaBorda, 56, 14f) {
+                onBackPressedDispatcher.onBackPressed()
             }
         )
 
@@ -987,10 +944,10 @@ class MainActivity : Activity() {
         val tela = criarBase()
         val conteudo = criarBase().apply {
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, dp(15), 0, dp(15))
+            setPadding(dp(4), dp(12), dp(4), dp(12))
         }
 
-        conteudo.addView(titulo(cliente.nome, 23f))
+        conteudo.addView(titulo(cliente.nome, 22f))
 
         val vencimento = proximoVencimento(cliente)
         val dias = diasAte(vencimento)
@@ -1001,7 +958,7 @@ class MainActivity : Activity() {
             textSize = 15f
             setTextColor(if (cliente.contato.isEmpty()) cinza else verde)
             gravity = Gravity.CENTER
-            setPadding(dp(12), dp(8), dp(12), dp(8))
+            setPadding(dp(12), dp(6), dp(12), dp(6))
             if (cliente.contato.isNotEmpty()) {
                 isClickable = true
                 setOnClickListener { abrirWhatsApp(cliente.contato) }
@@ -1010,7 +967,7 @@ class MainActivity : Activity() {
         conteudo.addView(contato)
 
         conteudo.addView(
-            texto("Dia da contratação\nTodo dia ${cliente.dia}", 15f)
+            texto("Dia da contratação\nTodo dia ${cliente.dia}", 14f)
         )
 
         val textoStatus = when (dias) {
@@ -1025,36 +982,35 @@ class MainActivity : Activity() {
 
         conteudo.addView(espaco(10))
 
-        // Botão para dar baixa / renovar o mês
         conteudo.addView(
-            botao("CONFIRMAR PAGAMENTO / RENOVAR", verde, 64, 15f) {
+            botao("CONFIRMAR PAGAMENTO / RENOVAR", verde, 60, 14f) {
                 confirmarBaixaPagamento(cliente)
             }
         )
 
         if (cliente.contato.isNotEmpty()) {
             conteudo.addView(
-                botao("ABRIR WHATSAPP", verde, 64, 16f) {
+                botao("ABRIR WHATSAPP", verde, 60, 15f) {
                     abrirWhatsApp(cliente.contato)
                 }
             )
         }
 
         conteudo.addView(
-            botao("EDITAR CLIENTE", azul, 64, 16f) {
+            botao("EDITAR CLIENTE", azul, 60, 15f) {
                 navegarPara { mostrarAdicionarCliente(cliente) }
             }
         )
 
         conteudo.addView(
-            botao("EXCLUIR CLIENTE", vermelho, 64, 16f) {
+            botao("EXCLUIR CLIENTE", vermelho, 60, 15f) {
                 confirmarExclusao(cliente)
             }
         )
 
         conteudo.addView(
-            botao("VOLTAR", cinzaBorda, 60, 15f) {
-                onBackPressed()
+            botao("VOLTAR", cinzaBorda, 56, 14f) {
+                onBackPressedDispatcher.onBackPressed()
             }
         )
 
@@ -1117,21 +1073,8 @@ class MainActivity : Activity() {
                 val clientes = carregarClientes()
                 clientes.removeAll { it.nome == cliente.nome }
                 salvarClientes(clientes)
-                onBackPressed()
+                onBackPressedDispatcher.onBackPressed()
             }
             .show()
-    }
-
-    @Deprecated("Compatibilidade com Android")
-    override fun onBackPressed() {
-        if (pilhaTelas.size > 1) {
-            pilhaTelas.pop() // Remove a tela atual
-            val telaAnterior = pilhaTelas.peek()
-            navegandoVoltar = true
-            telaAnterior.invoke()
-        } else {
-            // Se estiver na tela inicial, minimiza ou fecha normalmente
-            finish()
-        }
     }
 }
