@@ -7,228 +7,68 @@ import org.json.JSONArray
 import java.util.Calendar
 
 class VencimentoWorker(
-    appContext: Context,
-    workerParams: WorkerParameters
-) : Worker(appContext, workerParams) {
+    private val contexto: Context,
+    parametros: WorkerParameters
+) : Worker(contexto, parametros) {
 
     override fun doWork(): Result {
+        val prefs = contexto.getSharedPreferences("rgb_play_gestao", Context.MODE_PRIVATE)
+        val texto = prefs.getString("clientes", "[]") ?: "[]"
+        val hoje = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
 
-        val preferencias =
-            applicationContext.getSharedPreferences(
-                "rgb_play_gestao",
-                Context.MODE_PRIVATE
-            )
+        try {
+            val array = JSONArray(texto)
+            val clientesNotificar = mutableListOf<String>()
 
-        val texto =
-            preferencias.getString(
-                "clientes",
-                "[]"
-            ) ?: "[]"
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                val nome = obj.optString("nome")
+                val dia = obj.optInt("dia")
+                val ultimoMesPago = obj.optString("ultimoMesPago", "")
 
-        return try {
+                val pendente = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
 
-            val clientes =
-                JSONArray(texto)
-
-            val hoje =
-                Calendar.getInstance()
-
-            for (i in 0 until clientes.length()) {
-
-                val cliente =
-                    clientes.getJSONObject(i)
-
-                val nome =
-                    cliente.optString("nome")
-
-                val dia =
-                    cliente.optInt("dia")
-
-                if (
-                    nome.isNotBlank() &&
-                    estaNosProximosTresDias(
-                        dia,
-                        hoje
-                    )
-                ) {
-
-                    val vencimento =
-                        proximoVencimento(
-                            dia,
-                            hoje
-                        )
-
-                    val dias =
-                        diferencaEmDias(
-                            hoje,
-                            vencimento
-                        )
-
-                    val mensagem =
-                        when (dias) {
-
-                            0 ->
-                                "O cliente $nome vence hoje."
-
-                            1 ->
-                                "O cliente $nome vence amanhã."
-
-                            else ->
-                                "O cliente $nome vence em $dias dias."
+                if (ultimoMesPago.isNotEmpty()) {
+                    val partes = ultimoMesPago.split("-")
+                    if (partes.size == 2) {
+                        val ano = partes[0].toIntOrNull()
+                        val mes = partes[1].toIntOrNull()
+                        if (ano != null && mes != null) {
+                            pendente.set(ano, mes - 1, 1)
+                            pendente.add(Calendar.MONTH, 1)
+                            val ultDia = pendente.getActualMaximum(Calendar.DAY_OF_MONTH)
+                            pendente.set(Calendar.DAY_OF_MONTH, minOf(dia, ultDia))
                         }
+                    }
+                } else {
+                    val ultDia = pendente.getActualMaximum(Calendar.DAY_OF_MONTH)
+                    pendente.set(Calendar.DAY_OF_MONTH, minOf(dia, ultDia))
+                }
 
-                    NotificacaoVencimento.mostrar(
-                        applicationContext,
-                        mensagem
-                    )
+                val dias = (pendente.timeInMillis - hoje.timeInMillis) / (1000L * 60L * 60L * 24L)
+
+                if (dias <= 3L) {
+                    clientesNotificar.add(nome)
                 }
             }
 
-            Result.success()
-
+            if (clientesNotificar.isNotEmpty()) {
+                NotificacaoVencimento.mostrar(contexto, clientesNotificar)
+            }
         } catch (_: Exception) {
-
-            Result.failure()
+            return Result.failure()
         }
-    }
 
-    private fun estaNosProximosTresDias(
-        dia: Int,
-        hoje: Calendar
-    ): Boolean {
-
-        val vencimento =
-            proximoVencimento(
-                dia,
-                hoje
-            )
-
-        val dias =
-            diferencaEmDias(
-                hoje,
-                vencimento
-            )
-
-        return dias in 0..2
-    }
-
-    private fun proximoVencimento(
-        dia: Int,
-        referencia: Calendar
-    ): Calendar {
-
-        var ano =
-            referencia.get(
-                Calendar.YEAR
-            )
-
-        var mes =
-            referencia.get(
-                Calendar.MONTH
-            )
-
-        while (true) {
-
-            val tentativa =
-                Calendar.getInstance().apply {
-
-                    set(
-                        ano,
-                        mes,
-                        1,
-                        0,
-                        0,
-                        0
-                    )
-
-                    set(
-                        Calendar.MILLISECOND,
-                        0
-                    )
-                }
-
-            val ultimoDia =
-                tentativa.getActualMaximum(
-                    Calendar.DAY_OF_MONTH
-                )
-
-            tentativa.set(
-                ano,
-                mes,
-                minOf(
-                    dia,
-                    ultimoDia
-                )
-            )
-
-            if (
-                !tentativa.before(
-                    referencia.inicioDoDia()
-                )
-            ) {
-                return tentativa
-            }
-
-            mes++
-
-            if (
-                mes >
-                Calendar.DECEMBER
-            ) {
-
-                mes =
-                    Calendar.JANUARY
-
-                ano++
-            }
-        }
-    }
-
-    private fun diferencaEmDias(
-        inicio: Calendar,
-        fim: Calendar
-    ): Int {
-
-        val inicioDia =
-            inicio.inicioDoDia()
-
-        val fimDia =
-            fim.inicioDoDia()
-
-        return (
-            fimDia.timeInMillis -
-                inicioDia.timeInMillis
-        ).div(
-            24L * 60L * 60L * 1000L
-        ).toInt()
-    }
-
-    private fun Calendar.inicioDoDia():
-        Calendar {
-
-        return (
-            clone() as Calendar
-        ).apply {
-
-            set(
-                Calendar.HOUR_OF_DAY,
-                0
-            )
-
-            set(
-                Calendar.MINUTE,
-                0
-            )
-
-            set(
-                Calendar.SECOND,
-                0
-            )
-
-            set(
-                Calendar.MILLISECOND,
-                0
-            )
-        }
+        return Result.success()
     }
 }

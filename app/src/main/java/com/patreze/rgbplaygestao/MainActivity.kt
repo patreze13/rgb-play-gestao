@@ -178,7 +178,7 @@ class MainActivity : Activity() {
     }
 
     // ============================================================
-    // CÁLCULO BASEADO NO ÚLTIMO MÊS PAGO
+    // CÁLCULO BASEADO NO ÚLTIMO MÊS PAGO (MANUAL)
     // ============================================================
 
     private fun obterVencimentoPendente(cliente: Cliente): Calendar {
@@ -194,7 +194,7 @@ class MainActivity : Activity() {
                     val cal = Calendar.getInstance().apply {
                         set(anoPago, mesPago - 1, 1, 0, 0, 0)
                         set(Calendar.MILLISECOND, 0)
-                        add(Calendar.MONTH, 1) // O pendente é o mês seguinte ao pago
+                        add(Calendar.MONTH, 1) // O pendente é o mês seguinte ao que foi quitado
                         val ultDia = getActualMaximum(Calendar.DAY_OF_MONTH)
                         set(Calendar.DAY_OF_MONTH, minOf(cliente.dia, ultDia))
                     }
@@ -203,7 +203,7 @@ class MainActivity : Activity() {
             }
         }
 
-        // Caso não tenha histórico, assume o ciclo deste mês
+        // Se nunca registrou pagamento, assume o mês corrente
         val calAtual = Calendar.getInstance().apply {
             set(hoje.get(Calendar.YEAR), hoje.get(Calendar.MONTH), 1, 0, 0, 0)
             set(Calendar.MILLISECOND, 0)
@@ -687,6 +687,7 @@ class MainActivity : Activity() {
                         return@botao
                     }
 
+                    // No cadastro novo hoje, o mês atual já conta como pago (adesão inicial)
                     val mesAtualQuitado = SimpleDateFormat("yyyy-MM", Locale.US).format(Date())
                     clientes.add(Cliente(nomeTexto, contatoTexto, diaNumero, ultimoMesPago = mesAtualQuitado))
                 } else {
@@ -801,7 +802,7 @@ class MainActivity : Activity() {
         adicionarNaTela(tela, criarAreaCentral(conteudo))
     }
 
-    // Cores exatas:
+    // Cores:
     // EM DIA -> Fundo preto com borda verde
     // PRÓXIMO -> Fundo preto com borda vermelha
     // VENCIDO -> Fundo totalmente vermelho sem borda, texto todo branco
@@ -820,7 +821,7 @@ class MainActivity : Activity() {
             setPadding(dp(16), dp(12), dp(16), dp(12))
             background = GradientDrawable().apply {
                 if (ehVencido) {
-                    setColor(vermelho) // Bloco vermelho sólido
+                    setColor(vermelho)
                     setStroke(0, Color.TRANSPARENT)
                 } else {
                     setColor(fundoCard)
@@ -1001,7 +1002,6 @@ class MainActivity : Activity() {
 
         conteudo.addView(espaco(10))
 
-        // Botão para selecionar o último mês pago manualmente
         conteudo.addView(
             botao("ÚLTIMO MÊS PAGO", azul, 60, 15f) {
                 abrirSeletorUltimoMesPago(cliente)
@@ -1037,14 +1037,13 @@ class MainActivity : Activity() {
         adicionarNaTela(tela, criarAreaCentral(conteudo))
     }
 
-    // Modal com lista de meses retroativos e futuros
     private fun abrirSeletorUltimoMesPago(cliente: Cliente) {
         val opcoesLegiveis = mutableListOf<String>()
         val chavesAnoMes = mutableListOf<String>()
 
         val cal = Calendar.getInstance().apply {
             set(Calendar.DAY_OF_MONTH, 1)
-            add(Calendar.MONTH, -6) // Mostra desde 6 meses atrás até 6 meses à frente
+            add(Calendar.MONTH, -6)
         }
 
         val formatoLegivel = SimpleDateFormat("MMMM / yyyy", Locale("pt", "BR"))
