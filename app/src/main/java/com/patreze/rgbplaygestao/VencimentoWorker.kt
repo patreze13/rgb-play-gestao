@@ -63,7 +63,12 @@ class VencimentoWorker(
             }
 
             if (clientesNotificar.isNotEmpty()) {
-                NotificacaoVencimento.mostrar(contexto, clientesNotificar)
+                val mensagemFinal = if (clientesNotificar.size == 1) {
+                    "${clientesNotificar.first()} está vencendo ou venceu!"
+                } else {
+                    "${clientesNotificar.size} clientes vencendo/vencidos: ${clientesNotificar.joinToString(", ")}"
+                }
+                NotificacaoVencimento.mostrar(contexto, mensagemFinal)
             }
         } catch (_: Exception) {
             return Result.failure()
