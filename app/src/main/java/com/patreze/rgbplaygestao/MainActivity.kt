@@ -20,6 +20,7 @@ import android.text.InputFilter
 import android.text.InputType
 import android.text.TextWatcher
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.*
@@ -42,8 +43,14 @@ data class Cliente(
     var nome: String,
     var contato: String,
     var dia: Int,
-    var ultimoMesPago: String = ""
+    var ultimoMesPago: String = "" // Formato "yyyy-MM" (ex: "2026-08")
 )
+
+enum class StatusVencimento {
+    VENCIDO,
+    PROXIMO,
+    EM_DIA
+}
 
 class MainActivity : Activity() {
 
@@ -57,13 +64,14 @@ class MainActivity : Activity() {
     private val pilhaTelas = Stack<() -> Unit>()
     private var navegandoVoltar = false
 
+    // Cores Dark
     private val fundoCard = Color.rgb(20, 20, 22)
     private val fundoCampo = Color.rgb(18, 18, 20)
     private val branco = Color.rgb(255, 255, 255)
     private val cinza = Color.rgb(160, 160, 160)
     private val cinzaBorda = Color.rgb(55, 55, 60)
     private val verde = Color.rgb(0, 230, 118)
-    private val vermelho = Color.rgb(255, 61, 0)
+    private val vermelho = Color.rgb(244, 67, 54)
     private val azul = Color.rgb(41, 121, 255)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,7 +91,7 @@ class MainActivity : Activity() {
         acao()
     }
 
-    override fun onBackPressed() {
+    private fun voltarTela() {
         if (pilhaTelas.size > 1) {
             pilhaTelas.pop()
             val telaAnterior = pilhaTelas.peek()
@@ -92,6 +100,19 @@ class MainActivity : Activity() {
         } else {
             finish()
         }
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+            voltarTela()
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    @Deprecated("Compatibilidade")
+    override fun onBackPressed() {
+        voltarTela()
     }
 
     private fun solicitarPermissaoNotificacao() {
@@ -156,36 +177,47 @@ class MainActivity : Activity() {
         preferencias.edit().putString("clientes", array.toString()).apply()
     }
 
-    private fun chaveMes(cal: Calendar): String {
-        return SimpleDateFormat("yyyy-MM", Locale.US).format(cal.time)
+    // ============================================================
+    // CÁLCULO BASEADO NO ÚLTIMO MÊS PAGO
+    // ============================================================
+
+    private fun obterVencimentoPendente(cliente: Cliente): Calendar {
+        val hoje = Calendar.getInstance().inicioDoDia()
+
+        if (cliente.ultimoMesPago.isNotEmpty()) {
+            val partes = cliente.ultimoMesPago.split("-")
+            if (partes.size == 2) {
+                val anoPago = partes[0].toIntOrNull()
+                val mesPago = partes[1].toIntOrNull()
+
+                if (anoPago != null && mesPago != null) {
+                    val cal = Calendar.getInstance().apply {
+                        set(anoPago, mesPago - 1, 1, 0, 0, 0)
+                        set(Calendar.MILLISECOND, 0)
+                        add(Calendar.MONTH, 1) // O pendente é o mês seguinte ao pago
+                        val ultDia = getActualMaximum(Calendar.DAY_OF_MONTH)
+                        set(Calendar.DAY_OF_MONTH, minOf(cliente.dia, ultDia))
+                    }
+                    return cal
+                }
+            }
+        }
+
+        // Caso não tenha histórico, assume o ciclo deste mês
+        val calAtual = Calendar.getInstance().apply {
+            set(hoje.get(Calendar.YEAR), hoje.get(Calendar.MONTH), 1, 0, 0, 0)
+            set(Calendar.MILLISECOND, 0)
+            val ultDia = getActualMaximum(Calendar.DAY_OF_MONTH)
+            set(Calendar.DAY_OF_MONTH, minOf(cliente.dia, ultDia))
+        }
+        return calAtual
     }
 
-    private fun proximoVencimento(cliente: Cliente): Calendar {
-        val hoje = Calendar.getInstance().inicioDoDia()
-        var ano = hoje.get(Calendar.YEAR)
-        var mes = hoje.get(Calendar.MONTH)
-
-        while (true) {
-            val tentativa = Calendar.getInstance().apply {
-                set(ano, mes, 1, 0, 0, 0)
-                set(Calendar.MILLISECOND, 0)
-            }
-            val ultimoDia = tentativa.getActualMaximum(Calendar.DAY_OF_MONTH)
-            tentativa.set(ano, mes, minOf(cliente.dia, ultimoDia), 0, 0, 0)
-
-            val chaveTentativa = chaveMes(tentativa)
-            val naoPassouDeHoje = !tentativa.before(hoje)
-            val mesNaoPago = cliente.ultimoMesPago != chaveTentativa
-
-            if (naoPassouDeHoje && mesNaoPago) {
-                return tentativa
-            }
-
-            mes++
-            if (mes > Calendar.DECEMBER) {
-                mes = Calendar.JANUARY
-                ano++
-            }
+    private fun obterStatus(dias: Long): StatusVencimento {
+        return when {
+            dias < 0L -> StatusVencimento.VENCIDO
+            dias in 0L..3L -> StatusVencimento.PROXIMO
+            else -> StatusVencimento.EM_DIA
         }
     }
 
@@ -210,6 +242,16 @@ class MainActivity : Activity() {
 
     private fun formatarDiaMes(calendario: Calendar): String {
         return SimpleDateFormat("dd/MM", Locale("pt", "BR")).format(calendario.time)
+    }
+
+    private fun formatarNomeMes(chaveAnoMes: String): String {
+        if (chaveAnoMes.isEmpty()) return "Nenhum registrado"
+        val partes = chaveAnoMes.split("-")
+        if (partes.size != 2) return chaveAnoMes
+        val cal = Calendar.getInstance().apply {
+            set(partes[0].toInt(), partes[1].toInt() - 1, 1)
+        }
+        return SimpleDateFormat("MMMM / yyyy", Locale("pt", "BR")).format(cal.time).replaceFirstChar { it.uppercase() }
     }
 
     private fun obterFundoComTextura(): GradientDrawable {
@@ -658,13 +700,13 @@ class MainActivity : Activity() {
 
                 salvarClientes(clientes)
                 Toast.makeText(this, if (editando) "Cliente atualizado." else "Cliente cadastrado com sucesso!", Toast.LENGTH_SHORT).show()
-                onBackPressed()
+                voltarTela()
             }
         )
 
         conteudo.addView(
             botao("VOLTAR", cinzaBorda, 56, 14f) {
-                onBackPressed()
+                voltarTela()
             }
         )
 
@@ -681,7 +723,7 @@ class MainActivity : Activity() {
         conteudo.addView(titulo("CLIENTES", 22f))
 
         val todosClientes = carregarClientes()
-        todosClientes.sortBy { proximoVencimento(it).timeInMillis }
+        todosClientes.sortBy { obterVencimentoPendente(it).timeInMillis }
 
         val campoBusca = campo("Pesquisar por nome ou contato...").apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -719,9 +761,11 @@ class MainActivity : Activity() {
             }
 
             filtrados.forEach { cliente ->
-                val dias = diasAte(proximoVencimento(cliente))
-                val estaCritico = dias in 0L..3L
-                val card = criarCardRetangular(cliente, estaCritico) {
+                val pendente = obterVencimentoPendente(cliente)
+                val dias = diasAte(pendente)
+                val status = obterStatus(dias)
+
+                val card = criarCardRetangular(cliente, pendente, dias, status) {
                     navegarPara { mostrarDetalhesCliente(cliente) }
                 }
 
@@ -750,28 +794,39 @@ class MainActivity : Activity() {
         conteudo.addView(espaco(10))
         conteudo.addView(
             botao("VOLTAR", cinzaBorda, 56, 14f) {
-                onBackPressed()
+                voltarTela()
             }
         )
 
         adicionarNaTela(tela, criarAreaCentral(conteudo))
     }
 
+    // Cores exatas:
+    // EM DIA -> Fundo preto com borda verde
+    // PRÓXIMO -> Fundo preto com borda vermelha
+    // VENCIDO -> Fundo totalmente vermelho sem borda, texto todo branco
     private fun criarCardRetangular(
         cliente: Cliente,
-        critico: Boolean,
+        vencimento: Calendar,
+        dias: Long,
+        status: StatusVencimento,
         acao: () -> Unit
     ): LinearLayout {
-        val corDestaque = if (critico) vermelho else verde
-        val vencimento = proximoVencimento(cliente)
+        val ehVencido = status == StatusVencimento.VENCIDO
 
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(16), dp(12), dp(16), dp(12))
             background = GradientDrawable().apply {
-                setColor(fundoCard)
-                setStroke(dp(1), corDestaque)
+                if (ehVencido) {
+                    setColor(vermelho) // Bloco vermelho sólido
+                    setStroke(0, Color.TRANSPARENT)
+                } else {
+                    setColor(fundoCard)
+                    val corBorda = if (status == StatusVencimento.PROXIMO) vermelho else verde
+                    setStroke(dp(1), corBorda)
+                }
                 cornerRadius = dp(12).toFloat()
             }
             isClickable = true
@@ -796,7 +851,7 @@ class MainActivity : Activity() {
             val txtSub = TextView(context).apply {
                 text = "Todo dia ${cliente.dia}"
                 textSize = 12f
-                setTextColor(cinza)
+                setTextColor(if (ehVencido) Color.rgb(240, 240, 240) else cinza)
                 setPadding(0, dp(2), 0, 0)
             }
             colunaInfo.addView(txtSub)
@@ -811,23 +866,24 @@ class MainActivity : Activity() {
             val txtVenc = TextView(context).apply {
                 text = formatarDiaMes(vencimento)
                 textSize = 16f
-                setTextColor(corDestaque)
+                setTextColor(branco)
                 typeface = Typeface.DEFAULT_BOLD
             }
             colunaData.addView(txtVenc)
 
-            val dias = diasAte(vencimento)
-            val labelStatus = when (dias) {
-                0L -> "Hoje"
-                1L -> "Amanhã"
-                in 2L..3L -> "Em $dias d"
+            val labelStatus = when {
+                ehVencido -> "VENCIDO"
+                dias == 0L -> "Hoje"
+                dias == 1L -> "Amanhã"
+                dias in 2L..3L -> "Em $dias d"
                 else -> "Em dia"
             }
 
             val txtLabel = TextView(context).apply {
                 text = labelStatus
                 textSize = 11f
-                setTextColor(if (critico) vermelho else cinza)
+                setTextColor(if (ehVencido) branco else if (status == StatusVencimento.PROXIMO) vermelho else cinza)
+                typeface = if (ehVencido || status == StatusVencimento.PROXIMO) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
             }
             colunaData.addView(txtLabel)
 
@@ -844,17 +900,16 @@ class MainActivity : Activity() {
 
         conteudo.addView(titulo("PRÓXIMOS VENCIMENTOS", 22f))
 
-        val clientes = carregarClientes().filter {
-            val vencimento = proximoVencimento(it)
-            val dias = diasAte(vencimento)
-            dias in 0L..3L
+        val clientesCriticos = carregarClientes().filter {
+            val dias = diasAte(obterVencimentoPendente(it))
+            dias <= 3L
         }.sortedBy {
-            proximoVencimento(it).timeInMillis
+            obterVencimentoPendente(it).timeInMillis
         }
 
-        if (clientes.isEmpty()) {
+        if (clientesCriticos.isEmpty()) {
             conteudo.addView(
-                texto("Nenhum cliente vence\nnos próximos 3 dias.", 15f)
+                texto("Nenhum cliente vencido ou\nvencendo nos próximos 3 dias.", 15f)
             )
         } else {
             val container = LinearLayout(this).apply {
@@ -865,8 +920,12 @@ class MainActivity : Activity() {
                 )
             }
 
-            clientes.forEach { cliente ->
-                val card = criarCardRetangular(cliente, true) {
+            clientesCriticos.forEach { cliente ->
+                val pendente = obterVencimentoPendente(cliente)
+                val dias = diasAte(pendente)
+                val status = obterStatus(dias)
+
+                val card = criarCardRetangular(cliente, pendente, dias, status) {
                     navegarPara { mostrarDetalhesCliente(cliente) }
                 }
 
@@ -887,7 +946,7 @@ class MainActivity : Activity() {
         conteudo.addView(espaco(12))
         conteudo.addView(
             botao("VOLTAR", cinzaBorda, 56, 14f) {
-                onBackPressed()
+                voltarTela()
             }
         )
 
@@ -903,8 +962,9 @@ class MainActivity : Activity() {
 
         conteudo.addView(titulo(cliente.nome, 22f))
 
-        val vencimento = proximoVencimento(cliente)
+        val vencimento = obterVencimentoPendente(cliente)
         val dias = diasAte(vencimento)
+        val ehVencido = dias < 0L
         val contatoExibicao = if (cliente.contato.isEmpty()) "Não informado" else cliente.contato
 
         val contato = TextView(this).apply {
@@ -924,21 +984,27 @@ class MainActivity : Activity() {
             texto("Dia da contratação\nTodo dia ${cliente.dia}", 14f)
         )
 
-        val textoStatus = when (dias) {
-            0L -> "VENCE HOJE"
-            1L -> "VENCE AMANHÃ"
+        val textoStatus = when {
+            ehVencido -> "VENCIDO (${-dias} dias em atraso)"
+            dias == 0L -> "VENCE HOJE"
+            dias == 1L -> "VENCE AMANHÃ"
             else -> "Faltam $dias dias"
         }
 
         conteudo.addView(
-            texto("Próximo vencimento\n${formatarData(vencimento)}\n$textoStatus", 15f)
+            texto("Vencimento pendente\n${formatarData(vencimento)}\n$textoStatus", 15f)
+        )
+
+        conteudo.addView(
+            texto("Último mês pago registrado:\n${formatarNomeMes(cliente.ultimoMesPago)}", 13f)
         )
 
         conteudo.addView(espaco(10))
 
+        // Botão para selecionar o último mês pago manualmente
         conteudo.addView(
-            botao("CONFIRMAR PAGAMENTO / RENOVAR", verde, 60, 14f) {
-                confirmarBaixaPagamento(cliente)
+            botao("ÚLTIMO MÊS PAGO", azul, 60, 15f) {
+                abrirSeletorUltimoMesPago(cliente)
             }
         )
 
@@ -951,7 +1017,7 @@ class MainActivity : Activity() {
         }
 
         conteudo.addView(
-            botao("EDITAR CLIENTE", azul, 60, 15f) {
+            botao("EDITAR CLIENTE", cinzaBorda, 60, 15f) {
                 navegarPara { mostrarAdicionarCliente(cliente) }
             }
         )
@@ -964,32 +1030,51 @@ class MainActivity : Activity() {
 
         conteudo.addView(
             botao("VOLTAR", cinzaBorda, 56, 14f) {
-                onBackPressed()
+                voltarTela()
             }
         )
 
         adicionarNaTela(tela, criarAreaCentral(conteudo))
     }
 
-    private fun confirmarBaixaPagamento(cliente: Cliente) {
-        val vencimentoAtual = proximoVencimento(cliente)
-        val dataFormatada = formatarData(vencimentoAtual)
+    // Modal com lista de meses retroativos e futuros
+    private fun abrirSeletorUltimoMesPago(cliente: Cliente) {
+        val opcoesLegiveis = mutableListOf<String>()
+        val chavesAnoMes = mutableListOf<String>()
+
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.DAY_OF_MONTH, 1)
+            add(Calendar.MONTH, -6) // Mostra desde 6 meses atrás até 6 meses à frente
+        }
+
+        val formatoLegivel = SimpleDateFormat("MMMM / yyyy", Locale("pt", "BR"))
+        val formatoChave = SimpleDateFormat("yyyy-MM", Locale.US)
+
+        for (i in 0..12) {
+            val nomeFormatado = formatoLegivel.format(cal.time).replaceFirstChar { it.uppercase() }
+            val chave = formatoChave.format(cal.time)
+
+            opcoesLegiveis.add(nomeFormatado)
+            chavesAnoMes.add(chave)
+
+            cal.add(Calendar.MONTH, 1)
+        }
 
         AlertDialog.Builder(this)
-            .setTitle("Confirmar Pagamento")
-            .setMessage("Confirmar pagamento referente ao vencimento de $dataFormatada?\nO próximo vencimento irá para o mês seguinte.")
-            .setNegativeButton("CANCELAR", null)
-            .setPositiveButton("CONFIRMAR") { _, _ ->
+            .setTitle("Selecione o último mês quitado:")
+            .setItems(opcoesLegiveis.toTypedArray()) { _, qual ->
+                val chaveEscolhida = chavesAnoMes[qual]
                 val clientes = carregarClientes()
                 val cli = clientes.find { it.nome == cliente.nome }
                 if (cli != null) {
-                    cli.ultimoMesPago = chaveMes(vencimentoAtual)
+                    cli.ultimoMesPago = chaveEscolhida
                     salvarClientes(clientes)
-                    cliente.ultimoMesPago = cli.ultimoMesPago
-                    Toast.makeText(this, "Pagamento confirmado! Renovado até o próximo mês.", Toast.LENGTH_SHORT).show()
+                    cliente.ultimoMesPago = chaveEscolhida
+                    Toast.makeText(this, "Salvo: ${opcoesLegiveis[qual]}", Toast.LENGTH_SHORT).show()
                     mostrarDetalhesCliente(cliente)
                 }
             }
+            .setNegativeButton("CANCELAR", null)
             .show()
     }
 
@@ -1027,7 +1112,7 @@ class MainActivity : Activity() {
                 val clientes = carregarClientes()
                 clientes.removeAll { it.nome == cliente.nome }
                 salvarClientes(clientes)
-                onBackPressed()
+                voltarTela()
             }
             .show()
     }
